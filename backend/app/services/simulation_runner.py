@@ -5,23 +5,21 @@ Runs simulations in the background and records each Agent's actions, with real-t
 
 import os
 import sys
-import json
+import orjson
 import time
-import asyncio
 import threading
 import subprocess
 import signal
 import atexit
-from typing import Dict, Any, List, Optional, Union
+from typing import Dict, Any, List, Optional
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from queue import Queue
 
-from ..config import Config
 from ..utils.logger import get_logger
 from .graph_memory_updater import GraphMemoryManager
-from .simulation_ipc import SimulationIPCClient, CommandType, IPCResponse
+from .simulation_ipc import SimulationIPCClient
 
 logger = get_logger('miroshark.simulation_runner')
 
@@ -259,7 +257,7 @@ class SimulationRunner:
         
         try:
             with open(state_file, 'r', encoding='utf-8') as f:
-                data = json.load(f)
+                data = orjson.loads(f.read())
             
             state = SimulationRunState(
                 simulation_id=simulation_id,
@@ -321,7 +319,7 @@ class SimulationRunner:
         data = state.to_detail_dict()
         
         with open(state_file, 'w', encoding='utf-8') as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
+            f.write(orjson.dumps(data, option=orjson.OPT_INDENT_2).decode())
         
         cls._run_states[state.simulation_id] = state
     
@@ -361,10 +359,10 @@ class SimulationRunner:
         config_path = os.path.join(sim_dir, "simulation_config.json")
         
         if not os.path.exists(config_path):
-            raise ValueError(f"Simulation config does not exist, please call /prepare endpoint first")
+            raise ValueError("Simulation config does not exist, please call /prepare endpoint first")
         
         with open(config_path, 'r', encoding='utf-8') as f:
-            config = json.load(f)
+            config = orjson.loads(f.read())
         
         # Initialize run state
         time_config = config.get("time_config", {})
@@ -671,7 +669,7 @@ class SimulationRunner:
                     line = line.strip()
                     if line:
                         try:
-                            action_data = json.loads(line)
+                            action_data = orjson.loads(line)
                             
                             # Process event type entries
                             if "event_type" in action_data:
@@ -749,7 +747,7 @@ class SimulationRunner:
                             if graph_updater:
                                 graph_updater.add_activity_from_dict(action_data, platform)
                             
-                        except json.JSONDecodeError:
+                        except orjson.JSONDecodeError:
                             pass
                 return f.tell()
         except Exception as e:
@@ -923,7 +921,7 @@ class SimulationRunner:
                     continue
                 
                 try:
-                    data = json.loads(line)
+                    data = orjson.loads(line)
                     
                     # Skip non-action records (e.g. simulation_start, round_start, round_end events)
                     if "event_type" in data:
@@ -956,7 +954,7 @@ class SimulationRunner:
                         success=data.get("success", True),
                     ))
                     
-                except json.JSONDecodeError:
+                except orjson.JSONDecodeError:
                     continue
         
         return actions
@@ -1204,7 +1202,6 @@ class SimulationRunner:
         Returns:
             Cleanup result info
         """
-        import shutil
         
         sim_dir = os.path.join(cls.RUN_STATE_DIR, simulation_id)
         
@@ -1329,11 +1326,11 @@ class SimulationRunner:
                         logger.info(f"Attempting to update state.json: {state_file}")
                         if os.path.exists(state_file):
                             with open(state_file, 'r', encoding='utf-8') as f:
-                                state_data = json.load(f)
+                                state_data = orjson.loads(f.read())
                             state_data['status'] = 'stopped'
                             state_data['updated_at'] = datetime.now().isoformat()
                             with open(state_file, 'w', encoding='utf-8') as f:
-                                json.dump(state_data, f, indent=2, ensure_ascii=False)
+                                f.write(orjson.dumps(state_data, option=orjson.OPT_INDENT_2).decode())
                             logger.info(f"Updated state.json status to stopped: {simulation_id}")
                         else:
                             logger.warning(f"state.json does not exist: {state_file}")
@@ -1371,23 +1368,17 @@ class SimulationRunner:
         """
         Register cleanup function
         
-        Called when Flask application starts, ensures all simulation processes are cleaned up when server shuts down
+        Called when FastAPI application starts, ensures all simulation processes are cleaned up when server shuts down
         """
         global _cleanup_registered
         
         if _cleanup_registered:
             return
-        
-        # In Flask debug mode, only register cleanup in the reloader child process (the process actually running the app)
-        # WERKZEUG_RUN_MAIN=true indicates this is the reloader child process
-        # If not debug mode, this env var does not exist, and registration is also needed
-        is_reloader_process = os.environ.get('WERKZEUG_RUN_MAIN') == 'true'
-        is_debug_mode = os.environ.get('FLASK_DEBUG') == '1' or os.environ.get('WERKZEUG_RUN_MAIN') is not None
-        
-        # In debug mode, only register in reloader child process; always register in non-debug mode
-        if is_debug_mode and not is_reloader_process:
-            _cleanup_registered = True  # Mark as registered to prevent child process from trying again
-            return
+            
+        # In ASGI debug mode (uvicorn reload), we only want to register cleanup in the main worker
+        # Uvicorn doesn't set a unified env var like Werkzeug, so we just register it and catch signals.
+        import atexit
+        import signal
         
         # Save original signal handlers
         original_sigint = signal.getsignal(signal.SIGINT)
@@ -1405,7 +1396,7 @@ class SimulationRunner:
                 logger.info(f"Received signal {signum}, starting cleanup...")
             cls.cleanup_all_simulations()
             
-            # Call original signal handler to let Flask exit normally
+            # Call original signal handler to let the server exit normally
             if signum == signal.SIGINT and callable(original_sigint):
                 original_sigint(signum, frame)
             elif signum == signal.SIGTERM and callable(original_sigterm):
@@ -1496,14 +1487,14 @@ class SimulationRunner:
         
         try:
             with open(status_file, 'r', encoding='utf-8') as f:
-                status = json.load(f)
+                status = orjson.loads(f.read())
             return {
                 "status": status.get("status", "stopped"),
                 "twitter_available": status.get("twitter_available", False),
                 "reddit_available": status.get("reddit_available", False),
                 "timestamp": status.get("timestamp")
             }
-        except (json.JSONDecodeError, OSError):
+        except (orjson.JSONDecodeError, OSError):
             return default_status
 
     @classmethod
@@ -1664,7 +1655,7 @@ class SimulationRunner:
             raise ValueError(f"Simulation config does not exist: {simulation_id}")
 
         with open(config_path, 'r', encoding='utf-8') as f:
-            config = json.load(f)
+            config = orjson.loads(f.read())
 
         agent_configs = config.get("agent_configs", [])
         if not agent_configs:
@@ -1776,8 +1767,8 @@ class SimulationRunner:
             
             for user_id, info_json, created_at in cursor.fetchall():
                 try:
-                    info = json.loads(info_json) if info_json else {}
-                except json.JSONDecodeError:
+                    info = orjson.loads(info_json) if info_json else {}
+                except orjson.JSONDecodeError:
                     info = {"raw": info_json}
                 
                 results.append({

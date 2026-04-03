@@ -18,6 +18,7 @@ Usage:
     # (excludes Reddit since that's the platform about to act)
 """
 from collections import defaultdict
+import threading
 from typing import Dict, List, Optional
 
 
@@ -57,11 +58,12 @@ class CrossPlatformLog:
     """
     Shared in-memory log of agent actions across all platforms.
 
-    Safe for concurrent use within a single asyncio event loop
-    (all callers share the same thread).
+    Thread-safe (No-GIL): protège _log via Lock pour accès concurrent
+    quand les plateformes record() en parallèle.
     """
 
     def __init__(self, max_actions_per_agent: int = 15):
+        self._lock = threading.Lock()  # No-GIL thread safety
         # platform -> agent_id -> list of action dicts
         self._log: Dict[str, Dict[int, List[dict]]] = defaultdict(
             lambda: defaultdict(list)
@@ -70,33 +72,34 @@ class CrossPlatformLog:
 
     def record(self, platform: str, actions: List[dict]):
         """
-        Record a batch of actions from one platform round.
+        Record a batch of actions from one platform round. Thread-safe.
 
         Args:
             platform: Platform name ("twitter", "reddit", "polymarket", ...)
             actions: List of action dicts, each with at least:
                      agent_id, agent_name, action_type, action_args
         """
-        for action in actions:
-            agent_id = action.get('agent_id')
-            action_type = action.get('action_type', '')
+        with self._lock:
+            for action in actions:
+                agent_id = action.get('agent_id')
+                action_type = action.get('action_type', '')
 
-            if agent_id is None:
-                continue
-            if action_type in _SKIP_ACTIONS:
-                continue
+                if agent_id is None:
+                    continue
+                if action_type in _SKIP_ACTIONS:
+                    continue
 
-            entry = {
-                'action_type': action_type,
-                'args': action.get('action_args', {}),
-            }
+                entry = {
+                    'action_type': action_type,
+                    'args': action.get('action_args', {}),
+                }
 
-            bucket = self._log[platform][agent_id]
-            bucket.append(entry)
+                bucket = self._log[platform][agent_id]
+                bucket.append(entry)
 
-            # Trim to keep memory bounded
-            if len(bucket) > self.max_actions_per_agent:
-                del bucket[:-self.max_actions_per_agent]
+                # Trim to keep memory bounded
+                if len(bucket) > self.max_actions_per_agent:
+                    del bucket[:-self.max_actions_per_agent]
 
     def build_digest(
         self,
@@ -106,6 +109,7 @@ class CrossPlatformLog:
     ) -> Optional[str]:
         """
         Build a text digest of an agent's recent activity on OTHER platforms.
+        Thread-safe.
 
         Args:
             agent_id: The agent to build the digest for.
@@ -116,26 +120,27 @@ class CrossPlatformLog:
         Returns:
             A formatted string, or None if there's nothing to report.
         """
-        sections = []
+        with self._lock:
+            sections = []
 
-        for platform, agents in self._log.items():
-            if platform == exclude_platform:
-                continue
+            for platform, agents in self._log.items():
+                if platform == exclude_platform:
+                    continue
 
-            agent_actions = agents.get(agent_id)
-            if not agent_actions:
-                continue
+                agent_actions = agents.get(agent_id)
+                if not agent_actions:
+                    continue
 
-            lines = []
-            for entry in agent_actions[-max_items:]:
-                line = self._format_action(entry)
-                if line:
-                    lines.append(f"  - {line}")
+                lines = []
+                for entry in agent_actions[-max_items:]:
+                    line = self._format_action(entry)
+                    if line:
+                        lines.append(f"  - {line}")
 
-            if lines:
-                sections.append(
-                    f"On {platform.title()}:\n" + "\n".join(lines)
-                )
+                if lines:
+                    sections.append(
+                        f"On {platform.title()}:\n" + "\n".join(lines)
+                    )
 
         if not sections:
             return None
@@ -188,8 +193,9 @@ class CrossPlatformLog:
         return label
 
     def clear(self):
-        """Clear all recorded actions."""
-        self._log.clear()
+        """Clear all recorded actions. Thread-safe."""
+        with self._lock:
+            self._log.clear()
 
 
 # Cross-platform context marker used to find/replace the injected section

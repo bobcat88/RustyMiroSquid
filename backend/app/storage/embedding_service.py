@@ -13,7 +13,7 @@ import time
 import logging
 from typing import List, Optional
 
-import requests
+import httpx
 
 from ..config import Config
 
@@ -138,26 +138,26 @@ class EmbeddingService:
         last_error = None
         for attempt in range(self.max_retries):
             try:
-                response = requests.post(
-                    self._embed_url,
-                    json=payload,
-                    headers=headers,
-                    timeout=self.timeout,
-                )
+                with httpx.Client(timeout=self.timeout) as client:
+                    response = client.post(
+                        self._embed_url,
+                        json=payload,
+                        headers=headers,
+                    )
                 response.raise_for_status()
                 return parser(response.json(), len(payload["input"]))
 
-            except requests.exceptions.ConnectionError as e:
+            except httpx.ConnectError as e:
                 last_error = e
                 logger.warning(
                     f"Embedding connection failed (attempt {attempt + 1}/{self.max_retries}): {e}"
                 )
-            except requests.exceptions.Timeout as e:
+            except httpx.TimeoutException as e:
                 last_error = e
                 logger.warning(
                     f"Embedding request timed out (attempt {attempt + 1}/{self.max_retries})"
                 )
-            except requests.exceptions.HTTPError as e:
+            except httpx.HTTPStatusError as e:
                 last_error = e
                 logger.error(f"Embedding HTTP error: {e.response.status_code} - {e.response.text}")
                 if e.response.status_code >= 500:

@@ -1,17 +1,18 @@
 [project]
-name = "miroshark-backend"
-version = "0.1.0"
-description = "MiroShark - A Simple and Universal Swarm Intelligence Engine, Predicting Anything"
-requires-python = ">=3.11"
+name = "rustymirosquid-backend"
+version = "1.0.0"
+description = "RustyMiroSquid - High-Performance Multi-Agent Investment Simulation Engine"
+requires-python = ">=3.13,<3.15"
 license = { text = "AGPL-3.0" }
 authors = [
-    { name = "MiroShark Team" }
+    { name = "PROUST / Johan" }
 ]
 
 dependencies = [
-    # Core framework
-    "flask>=3.0.0",
-    "flask-cors>=6.0.0",
+    # Core framework (Migrated to FastAPI)
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "pydantic-settings>=2.4.0",
 
     # LLM related
     "openai>=1.0.0",
@@ -19,25 +20,10 @@ dependencies = [
     # Neo4j
     "neo4j>=5.15.0",
 
-    # HTTP requests (for Ollama embedding API)
-    "requests>=2.31.0",
-
-    # OASIS social media simulation (Wonderwall fork)
-    # Wonderwall (oasis package) is bundled directly in backend/oasis/
-    # "camel-oasis==0.2.5",  # replaced by bundled Wonderwall
-    "camel-ai==0.2.78",
-
-    # Wonderwall runtime dependencies (used by recsys, agent_graph, agents_generator)
-    # These are hard imports that crash on startup if missing.
-    "numpy>=1.26.0",
-    "pandas>=2.0.0",
-    "scikit-learn>=1.3.0",
-    "torch>=2.0.0",
-    "sentence-transformers>=2.2.0",
-    "igraph>=0.11.0",
+    # HTTP requests (for Ollama embedding API and fetcher)
+    "httpx>=0.27.0",
 
     # File processing
-    "PyMuPDF>=1.24.0",
     # Encoding detection (supports non-UTF-8 encoded text files)
     "charset-normalizer>=3.0.0",
     "chardet>=5.0.0",
@@ -45,6 +31,16 @@ dependencies = [
     # Utility libraries
     "python-dotenv>=1.0.0",
     "pydantic>=2.0.0",
+
+    # ============= RustyMiroSquid — Rust-native data path =============
+    "orjson>=3.10.0",          # Sérialisation JSON Rust-native (remplace json stdlib)
+    "polars>=1.30.0",          # Traitement de données Rust-native (remplace pandas pour analytics)
+
+    # ============= Token Optimization =============
+    "redis>=5.0.0",            # Semantic caching
+
+    # ============= Real-time Market Data =============
+    "websockets>=13.0",        # WebSocket async pour Binance/market feeds
 ]
 
 [project.optional-dependencies]
@@ -65,9 +61,60 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [dependency-groups]
+cpu = [
+    "numpy>=2.0.0",
+    "pandas>=2.2.0",
+    "scikit-learn>=1.5.0",
+    "igraph>=0.11.0",
+    "torch>=2.5.0",
+    "sentence-transformers>=2.2.0",
+    "llmlingua>=0.2.0",
+    "camel-ai==0.2.78",
+    "PyMuPDF>=1.24.0",
+    "yfinance>=0.2.40",
+]
+nvidia = [
+    "numpy>=2.0.0",
+    "pandas>=2.2.0",
+    "scikit-learn>=1.5.0",
+    "igraph>=0.11.0",
+    "torch>=2.5.0",
+    "sentence-transformers>=2.2.0",
+    "llmlingua>=0.2.0",
+    "camel-ai==0.2.78",
+    "PyMuPDF>=1.24.0",
+    "yfinance>=0.2.40",
+]
+amd = [
+    "numpy>=2.0.0",
+    "pandas>=2.2.0",
+    "scikit-learn>=1.5.0",
+    "igraph>=0.11.0",
+    "torch>=2.5.0",
+    "sentence-transformers>=2.2.0",
+    "llmlingua>=0.2.0",
+    "camel-ai==0.2.78",
+    "PyMuPDF>=1.24.0",
+    "yfinance>=0.2.40",
+]
+mac = [
+    "numpy>=2.0.0",
+    "pandas>=2.2.0",
+    "scikit-learn>=1.5.0",
+    "igraph>=0.11.0",
+    "torch>=2.5.0",
+    "sentence-transformers>=2.2.0",
+    "llmlingua>=0.2.0",
+    "camel-ai==0.2.78",
+    "PyMuPDF>=1.24.0",
+    "yfinance>=0.2.40",
+]
 dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.23.0",
+    "pytest-cov>=7.1.0",
+    "pytest-httpx>=0.36.0",
+    "python-multipart>=0.0.22",
 ]
 
 [tool.hatch.build.targets.wheel]

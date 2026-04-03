@@ -7,7 +7,7 @@ Test market generation + initial pricing in a live Polymarket simulation.
 3. Run 5 rounds and verify prices, trades, and agent behavior
 """
 
-import json
+import orjson
 import os
 import sys
 import time
@@ -106,11 +106,11 @@ def test_live_simulation(markets):
 
     # Load profiles
     with open(os.path.join(OUT_DIR, '04_profiles.json')) as f:
-        phase4_profiles = json.load(f)
+        phase4_profiles = orjson.loads(f.read())
 
     # Load base config
     with open(os.path.join(OUT_DIR, '05_simulation_config.json')) as f:
-        config = json.load(f)
+        config = orjson.loads(f.read())
 
     agent_configs = config.get('agent_configs', [])
 
@@ -128,7 +128,7 @@ def test_live_simulation(markets):
         })
 
     with open(os.path.join(SIM_DIR, 'polymarket_profiles.json'), 'w') as f:
-        json.dump(pm_profiles, f, ensure_ascii=False, indent=2)
+        f.write(orjson.dumps(pm_profiles, option=orjson.OPT_INDENT_2).decode())
 
     # Override config
     config['time_config']['off_peak_activity_multiplier'] = 1.0
@@ -149,10 +149,10 @@ def test_live_simulation(markets):
 
     config_path = os.path.join(SIM_DIR, 'simulation_config.json')
     with open(config_path, 'w') as f:
-        json.dump(config, f, ensure_ascii=False, indent=2)
+        f.write(orjson.dumps(config, option=orjson.OPT_INDENT_2).decode())
 
     print(f"  {len(pm_profiles)} traders, {len(markets)} markets, 5 rounds")
-    print(f"  Markets seeded:")
+    print("  Markets seeded:")
     for m in markets:
         prob = m['initial_probability']
         print(f"    \"{m['question'][:60]}...\" @ YES ${prob:.2f}")
@@ -224,7 +224,7 @@ def analyze_market_results(markets):
         print(f"  {q_short:<55} ${start_price:.2f}  ${final_price:.2f}  {direction}{abs(move):.2f}   {trades:>4}")
 
     # Trade details
-    print(f"\n  All trades:")
+    print("\n  All trades:")
     for t in conn.execute("""
         SELECT t.*, u.user_name FROM trade t
         JOIN user u ON t.user_id = u.user_id
@@ -244,7 +244,7 @@ def analyze_market_results(markets):
             print(f"    {side:4s} | {agent:35s} | M#{mid} {shares:6.1f} {outcome:3s} @ ${price:.3f} | +${cost:.2f}")
 
     # Portfolio P&L
-    print(f"\n  Trader P&L:")
+    print("\n  Trader P&L:")
     for row in conn.execute("""
         SELECT p.user_id, p.balance, u.user_name FROM portfolio p
         JOIN user u ON p.user_id = u.user_id ORDER BY p.user_id
@@ -295,7 +295,7 @@ def analyze_market_results(markets):
 
 def main():
     print(f"\n{'#'*60}")
-    print(f"  Market Generation + Pricing Test")
+    print("  Market Generation + Pricing Test")
     print(f"  {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"{'#'*60}")
 

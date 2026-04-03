@@ -10,11 +10,10 @@ Features:
 """
 
 import os
-import json
-import time
+import orjson
 import re
 from typing import Dict, Any, List, Optional, Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 
@@ -22,11 +21,7 @@ from ..config import Config
 from ..utils.llm_client import LLMClient, create_smart_llm_client
 from ..utils.logger import get_logger
 from .graph_tools import (
-    GraphToolsService,
-    SearchResult,
-    InsightForgeResult,
-    PanoramaResult,
-    InterviewResult
+    GraphToolsService
 )
 
 logger = get_logger('miroshark.report_agent')
@@ -94,7 +89,7 @@ class ReportLogger:
         
         # Append to JSONL file
         with open(self.log_file_path, 'a', encoding='utf-8') as f:
-            f.write(json.dumps(log_entry, ensure_ascii=False) + '\n')
+            f.write(ororjson.dumps(log_entry).decode() + '\n')
     
     def log_start(self, simulation_id: str, graph_id: str, simulation_requirement: str):
         """Record report generation start"""
@@ -1245,7 +1240,7 @@ class ReportAgent:
             
             elif tool_name == "get_graph_statistics":
                 result = self.graph_tools.get_graph_statistics(self.graph_id)
-                return json.dumps(result, ensure_ascii=False, indent=2)
+                return ororjson.dumps(result, option=orjson.OPT_INDENT_2).decode()
             
             elif tool_name == "get_entity_summary":
                 entity_name = parameters.get("entity_name", "")
@@ -1253,7 +1248,7 @@ class ReportAgent:
                     graph_id=self.graph_id,
                     entity_name=entity_name
                 )
-                return json.dumps(result, ensure_ascii=False, indent=2)
+                return ororjson.dumps(result, option=orjson.OPT_INDENT_2).decode()
             
             elif tool_name == "get_simulation_context":
                 # Redirect to insight_forge, as it is more powerful
@@ -1268,7 +1263,7 @@ class ReportAgent:
                     entity_type=entity_type
                 )
                 result = [n.to_dict() for n in nodes]
-                return json.dumps(result, ensure_ascii=False, indent=2)
+                return ororjson.dumps(result, option=orjson.OPT_INDENT_2).decode()
             
             else:
                 return f"Unknown tool: {tool_name}. Please use one of: insight_forge, panorama_search, quick_search"
@@ -1298,12 +1293,12 @@ class ReportAgent:
 
         try:
             with open(trajectory_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
+                data = orjson.loads(f.read())
         except Exception as e:
             return f"Failed to read trajectory data: {str(e)}"
 
         lines = []
-        lines.append(f"=== Belief Trajectory Analysis ===")
+        lines.append("=== Belief Trajectory Analysis ===")
         lines.append(f"Topics tracked: {', '.join(data.get('topics', []))}")
         lines.append(f"Total rounds: {data.get('total_rounds', 0)}")
         lines.append("")
@@ -1402,7 +1397,7 @@ class ReportAgent:
 
             try:
                 with open(actions_path, 'r', encoding='utf-8') as f:
-                    all_entries = [json.loads(l) for l in f if l.strip()]
+                    all_entries = [orjson.loads(l) for l in f if l.strip()]
             except Exception:
                 continue
 
@@ -1417,7 +1412,7 @@ class ReportAgent:
             if query_filter:
                 actions = [
                     a for a in actions
-                    if query_filter in json.dumps(a.get('action_args', {})).lower()
+                    if query_filter in orjson.dumps(a.get('action_args', {})).lower()
                     or query_filter in (a.get('agent_name', '') or '').lower()
                 ]
 
@@ -1474,7 +1469,7 @@ class ReportAgent:
                 for jsonl_file in found_jsonl:
                     try:
                         with open(jsonl_file, 'r', encoding='utf-8') as f:
-                            all_entries = [json.loads(l) for l in f if l.strip()]
+                            all_entries = [orjson.loads(l) for l in f if l.strip()]
                         actions = [a for a in all_entries if 'action_type' in a]
 
                         if round_filter is not None:
@@ -1482,7 +1477,7 @@ class ReportAgent:
                         if query_filter:
                             actions = [
                                 a for a in actions
-                                if query_filter in json.dumps(a.get('action_args', {})).lower()
+                                if query_filter in orjson.dumps(a.get('action_args', {})).lower()
                                 or query_filter in (a.get('agent_name', '') or '').lower()
                             ]
 
@@ -1527,7 +1522,7 @@ class ReportAgent:
 
             # If still no actions after recursive search, return a clear error
             if total_actions == 0:
-                lines.append(f"\n[ERROR] No simulation action data found. The simulation may not have completed successfully.")
+                lines.append("\n[ERROR] No simulation action data found. The simulation may not have completed successfully.")
                 lines.append(f"Searched directory: {sim_dir}")
                 if found_jsonl:
                     lines.append(f"Found {len(found_jsonl)} .jsonl file(s) but none contained matching action data.")
@@ -1583,7 +1578,7 @@ class ReportAgent:
                     )
 
             # Portfolios with P&L
-            lines.append(f"\n**Trader P&L:**")
+            lines.append("\n**Trader P&L:**")
             for row in conn.execute(
                 "SELECT p.user_id, p.balance, u.user_name FROM portfolio p "
                 "LEFT JOIN user u ON p.user_id = u.user_id ORDER BY p.user_id"
@@ -1631,9 +1626,9 @@ class ReportAgent:
         xml_pattern = r'<tool_call>\s*(\{.*?\})\s*</tool_call>'
         for match in re.finditer(xml_pattern, response, re.DOTALL):
             try:
-                call_data = json.loads(match.group(1))
+                call_data = orjson.loads(match.group(1))
                 tool_calls.append(call_data)
-            except json.JSONDecodeError:
+            except orjson.JSONDecodeError:
                 pass
 
         if tool_calls:
@@ -1644,11 +1639,11 @@ class ReportAgent:
         stripped = response.strip()
         if stripped.startswith('{') and stripped.endswith('}'):
             try:
-                call_data = json.loads(stripped)
+                call_data = orjson.loads(stripped)
                 if self._is_valid_tool_call(call_data):
                     tool_calls.append(call_data)
                     return tool_calls
-            except json.JSONDecodeError:
+            except orjson.JSONDecodeError:
                 pass
 
         # Response may contain thinking text + bare JSON, try to extract the last JSON object
@@ -1656,10 +1651,10 @@ class ReportAgent:
         match = re.search(json_pattern, stripped, re.DOTALL)
         if match:
             try:
-                call_data = json.loads(match.group(1))
+                call_data = orjson.loads(match.group(1))
                 if self._is_valid_tool_call(call_data):
                     tool_calls.append(call_data)
-            except json.JSONDecodeError:
+            except orjson.JSONDecodeError:
                 pass
 
         return tool_calls
@@ -1723,7 +1718,7 @@ class ReportAgent:
             total_edges=context.get('graph_statistics', {}).get('total_edges', 0),
             entity_types=list(context.get('graph_statistics', {}).get('entity_types', {}).keys()),
             total_entities=context.get('total_entities', 0),
-            related_facts_json=json.dumps(context.get('related_facts', [])[:10], ensure_ascii=False, indent=2),
+            related_facts_json=orjson.dumps(context.get('related_facts', [])[:10], ensure_ascii=False, indent=2),
         )
 
         try:
@@ -2066,7 +2061,7 @@ class ReportAgent:
         # Check if LLM returned None during forced finish
         if response is None:
             logger.error(f"Section {section.title} LLM returned None during forced finish, using default error message")
-            final_answer = f"(This section generation failed: LLM returned empty response, please retry later)"
+            final_answer = "(This section generation failed: LLM returned empty response, please retry later)"
         elif "Final Answer:" in response:
             final_answer = response.split("Final Answer:")[-1].strip()
         else:
@@ -2680,9 +2675,9 @@ class ReportManager:
                 total_lines = i + 1
                 if i >= from_line:
                     try:
-                        log_entry = json.loads(line.strip())
+                        log_entry = orjson.loads(line.strip())
                         logs.append(log_entry)
-                    except json.JSONDecodeError:
+                    except orjson.JSONDecodeError:
                         # Skip lines that fail to parse
                         continue
         
@@ -2717,7 +2712,7 @@ class ReportManager:
         cls._ensure_report_folder(report_id)
         
         with open(cls._get_outline_path(report_id), 'w', encoding='utf-8') as f:
-            json.dump(outline.to_dict(), f, ensure_ascii=False, indent=2)
+            f.write(orjson.dumps(outline.to_dict(), option=orjson.OPT_INDENT_2).decode())
         
         logger.info(f"Outline saved: {report_id}")
     
@@ -2853,7 +2848,7 @@ class ReportManager:
         }
         
         with open(cls._get_progress_path(report_id), 'w', encoding='utf-8') as f:
-            json.dump(progress_data, f, ensure_ascii=False, indent=2)
+            f.write(orjson.dumps(progress_data, option=orjson.OPT_INDENT_2).decode())
     
     @classmethod
     def get_progress(cls, report_id: str) -> Optional[Dict[str, Any]]:
@@ -2864,7 +2859,7 @@ class ReportManager:
             return None
         
         with open(path, 'r', encoding='utf-8') as f:
-            return json.load(f)
+            return orjson.loads(f.read())
     
     @classmethod
     def get_generated_sections(cls, report_id: str) -> List[Dict[str, Any]]:
@@ -2909,7 +2904,7 @@ class ReportManager:
         # Build report header
         md_content = f"# {outline.title}\n\n"
         md_content += f"> {outline.summary}\n\n"
-        md_content += f"---\n\n"
+        md_content += "---\n\n"
         
         # Read all section files in order
         sections = cls.get_generated_sections(report_id)
@@ -3060,7 +3055,7 @@ class ReportManager:
         
         # Save metadata JSON
         with open(cls._get_report_path(report.report_id), 'w', encoding='utf-8') as f:
-            json.dump(report.to_dict(), f, ensure_ascii=False, indent=2)
+            f.write(orjson.dumps(report.to_dict(), option=orjson.OPT_INDENT_2).decode())
         
         # Save outline
         if report.outline:
@@ -3087,7 +3082,7 @@ class ReportManager:
                 return None
         
         with open(path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
+            data = orjson.loads(f.read())
         
         # Rebuild Report object
         outline = None

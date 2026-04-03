@@ -8,9 +8,8 @@ Optimization improvements:
 3. Distinguish between individual entities and abstract group entities
 """
 
-import json
+import orjson
 import random
-import time
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -433,7 +432,7 @@ class OasisProfileGenerator:
         }
 
         if not self.graph_id:
-            logger.debug(f"Skip knowledge graph search: graph_id not set")
+            logger.debug("Skip knowledge graph search: graph_id not set")
             return results
 
         comprehensive_query = f"All information, activities, events, relationships and background about {entity_name}"
@@ -647,7 +646,7 @@ class OasisProfileGenerator:
 
                 # Try to parse JSON
                 try:
-                    result = json.loads(content)
+                    result = orjson.loads(content)
 
                     # Validate required fields
                     if "bio" not in result or not result["bio"]:
@@ -657,7 +656,7 @@ class OasisProfileGenerator:
 
                     return result
 
-                except json.JSONDecodeError as je:
+                except orjson.JSONDecodeError as je:
                     logger.warning(f"JSON parsing failed (attempt {attempt+1}): {str(je)[:80]}")
 
                     # Try to fix JSON
@@ -681,7 +680,6 @@ class OasisProfileGenerator:
     
     def _fix_truncated_json(self, content: str) -> str:
         """Fix truncated JSON (output truncated by max_tokens limit)"""
-        import re
         
         # If JSON is truncated, try to close it
         content = content.strip()
@@ -729,17 +727,17 @@ class OasisProfileGenerator:
             
             # 4. Try to parse
             try:
-                result = json.loads(json_str)
+                result = orjson.loads(json_str)
                 result["_fixed"] = True
                 return result
-            except json.JSONDecodeError as e:
+            except orjson.JSONDecodeError:
                 # 5. If still failing, try more aggressive fix
                 try:
                     # Remove all control characters
                     json_str = re.sub(r'[\x00-\x1f\x7f-\x9f]', ' ', json_str)
                     # Replace all consecutive whitespace
                     json_str = re.sub(r'\s+', ' ', json_str)
-                    result = json.loads(json_str)
+                    result = orjson.loads(json_str)
                     result["_fixed"] = True
                     return result
                 except:
@@ -754,7 +752,7 @@ class OasisProfileGenerator:
         
         # If meaningful content was extracted, mark as fixed
         if bio_match or persona_match:
-            logger.info(f"Extracted partial information from corrupted JSON")
+            logger.info("Extracted partial information from corrupted JSON")
             return {
                 "bio": bio,
                 "persona": persona,
@@ -762,7 +760,7 @@ class OasisProfileGenerator:
             }
         
         # 7. Complete failure, return basic structure
-        logger.warning(f"JSON fix failed, returning basic structure")
+        logger.warning("JSON fix failed, returning basic structure")
         return {
             "bio": entity_summary[:200] if entity_summary else f"{entity_type}: {entity_name}",
             "persona": entity_summary or f"{entity_name} is a {entity_type}."
@@ -799,7 +797,7 @@ class OasisProfileGenerator:
     ) -> str:
         """Build detailed persona prompt for individual entities"""
 
-        attrs_str = json.dumps(entity_attributes, ensure_ascii=False) if entity_attributes else "None"
+        attrs_str = ororjson.dumps(entity_attributes).decode() if entity_attributes else "None"
         context_str = context[:3000] if context else "No additional context"
 
         return f"""Create a persona for this person to use in a social media simulation.
@@ -843,7 +841,7 @@ IMPORTANT: Do NOT include karma, friend_count, follower_count, or statuses_count
     ) -> str:
         """Build detailed persona prompt for group/institutional entities"""
 
-        attrs_str = json.dumps(entity_attributes, ensure_ascii=False) if entity_attributes else "None"
+        attrs_str = ororjson.dumps(entity_attributes).decode() if entity_attributes else "None"
         context_str = context[:3000] if context else "No additional context"
 
         return f"""Create an official social media account persona for this organization.
@@ -905,7 +903,7 @@ IMPORTANT: Do NOT include karma, friend_count, follower_count, or statuses_count
         
         elif entity_type_lower in ["publicfigure", "expert", "faculty"]:
             return {
-                "bio": f"Expert and thought leader in their field.",
+                "bio": "Expert and thought leader in their field.",
                 "persona": f"{entity_name} is a recognized {entity_type.lower()} who shares insights and opinions on important matters. They are known for their expertise and influence in public discourse.",
                 "age": random.randint(35, 60),
                 "gender": random.choice(["male", "female"]),
@@ -1062,7 +1060,7 @@ IMPORTANT: Do NOT include karma, friend_count, follower_count, or statuses_count
                         # Reddit JSON format
                         profiles_data = [p.to_reddit_format() for p in existing_profiles]
                         with open(realtime_output_path, 'w', encoding='utf-8') as f:
-                            json.dump(profiles_data, f, ensure_ascii=False, indent=2)
+                            f.write(orjson.dumps(profiles_data, option=orjson.OPT_INDENT_2).decode())
                     else:
                         # Twitter CSV format
                         import csv
@@ -1100,7 +1098,7 @@ IMPORTANT: Do NOT include karma, friend_count, follower_count, or statuses_count
                     user_name=self._generate_username(entity.name),
                     name=entity.name,
                     bio=f"{entity_type}: {entity.name}",
-                    persona=entity.summary or f"A participant in social discussions.",
+                    persona=entity.summary or "A participant in social discussions.",
                     source_entity_uuid=entity.uuid,
                     source_entity_type=entity_type,
                 )
@@ -1181,14 +1179,14 @@ IMPORTANT: Do NOT include karma, friend_count, follower_count, or statuses_count
             f"[Generated] {entity_name} ({entity_type})",
             f"{separator}",
             f"Username: {profile.user_name}",
-            f"",
-            f"[Bio]",
+            "",
+            "[Bio]",
             f"{profile.bio}",
-            f"",
-            f"[Detailed Persona]",
+            "",
+            "[Detailed Persona]",
             f"{profile.persona}",
-            f"",
-            f"[Basic Attributes]",
+            "",
+            "[Basic Attributes]",
             f"Age: {profile.age} | Gender: {profile.gender} | MBTI: {profile.mbti}",
             f"Profession: {profile.profession} | Country: {profile.country}",
             f"Interested Topics: {topics_str}",
@@ -1341,7 +1339,7 @@ IMPORTANT: Do NOT include karma, friend_count, follower_count, or statuses_count
             data.append(item)
         
         with open(file_path, 'w', encoding='utf-8') as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
+            f.write(orjson.dumps(data, option=orjson.OPT_INDENT_2).decode())
         
         logger.info(f"Saved {len(profiles)} Reddit Profiles to {file_path} (JSON format, includes user_id field)")
 
@@ -1360,7 +1358,7 @@ IMPORTANT: Do NOT include karma, friend_count, follower_count, or statuses_count
             data.append(pm)
 
         with open(file_path, 'w', encoding='utf-8') as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
+            f.write(orjson.dumps(data, option=orjson.OPT_INDENT_2).decode())
 
         logger.info(f"Saved {len(profiles)} Polymarket profiles to {file_path}")
 

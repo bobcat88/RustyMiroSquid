@@ -16,7 +16,6 @@ Beliefs update heuristically after each round based on:
 from __future__ import annotations
 
 import hashlib
-import json
 import random
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Set

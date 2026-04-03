@@ -6,10 +6,14 @@ Provides simulation report generation, retrieval, and conversation endpoints
 import os
 import traceback
 import threading
-from flask import request, jsonify, send_file, current_app
+from typing import Dict, Any, Optional, List
+import uuid
+import tempfile
 
-from . import report_bp
-from ..config import Config
+from fastapi import APIRouter, Request, BackgroundTasks, HTTPException
+from fastapi.responses import FileResponse, JSONResponse
+from pydantic import BaseModel
+
 from ..services.report_agent import ReportAgent, ReportManager, ReportStatus
 from ..services.graph_tools import GraphToolsService
 from ..services.simulation_manager import SimulationManager
@@ -19,61 +23,49 @@ from ..utils.logger import get_logger
 
 logger = get_logger('miroshark.api.report')
 
+router = APIRouter(prefix="/report", tags=["report"])
+
+
+class GenerateReportRequest(BaseModel):
+    simulation_id: str
+    force_regenerate: bool = False
+
+class GenerateStatusRequest(BaseModel):
+    task_id: Optional[str] = None
+    simulation_id: Optional[str] = None
+
+class ChatRequest(BaseModel):
+    simulation_id: str
+    message: str
+    chat_history: List[Dict[str, Any]] = []
+
+class ToolSearchRequest(BaseModel):
+    graph_id: str
+    query: str
+    limit: int = 10
+
+class ToolStatisticsRequest(BaseModel):
+    graph_id: str
+
 
 # ============== Report Generation Endpoints ==============
 
-@report_bp.route('/generate', methods=['POST'])
-def generate_report():
-    """
-    Generate simulation analysis report (async task)
-
-    This is a time-consuming operation. The endpoint returns task_id immediately.
-    Use GET /api/report/generate/status to query progress.
-
-    Request (JSON):
-        {
-            "simulation_id": "sim_xxxx",    // Required, simulation ID
-            "force_regenerate": false        // Optional, force regeneration
-        }
-
-    Returns:
-        {
-            "success": true,
-            "data": {
-                "simulation_id": "sim_xxxx",
-                "task_id": "task_xxxx",
-                "status": "generating",
-                "message": "Report generation task started"
-            }
-        }
-    """
+@router.post("/generate")
+def generate_report(req: GenerateReportRequest, request: Request, background_tasks: BackgroundTasks):
     try:
-        data = request.get_json() or {}
+        simulation_id = req.simulation_id
+        force_regenerate = req.force_regenerate
 
-        simulation_id = data.get('simulation_id')
-        if not simulation_id:
-            return jsonify({
-                "success": False,
-                "error": "Please provide simulation_id"
-            }), 400
-
-        force_regenerate = data.get('force_regenerate', False)
-
-        # Get simulation info
         manager = SimulationManager()
         state = manager.get_simulation(simulation_id)
 
         if not state:
-            return jsonify({
-                "success": False,
-                "error": f"Simulation not found: {simulation_id}"
-            }), 404
+            return JSONResponse({"success": False, "error": f"Simulation not found: {simulation_id}"}, status_code=404)
 
-        # Check if a report already exists
         if not force_regenerate:
             existing_report = ReportManager.get_report_by_simulation(simulation_id)
             if existing_report and existing_report.status == ReportStatus.COMPLETED:
-                return jsonify({
+                return {
                     "success": True,
                     "data": {
                         "simulation_id": simulation_id,
@@ -82,35 +74,22 @@ def generate_report():
                         "message": "Report already exists",
                         "already_generated": True
                     }
-                })
+                }
 
-        # Get project info
         project = ProjectManager.get_project(state.project_id)
         if not project:
-            return jsonify({
-                "success": False,
-                "error": f"Project not found: {state.project_id}"
-            }), 404
+            return JSONResponse({"success": False, "error": f"Project not found: {state.project_id}"}, status_code=404)
 
         graph_id = state.graph_id or project.graph_id
         if not graph_id:
-            return jsonify({
-                "success": False,
-                "error": "Missing graph ID, please ensure the graph has been built"
-            }), 400
+            return JSONResponse({"success": False, "error": "Missing graph ID, please ensure the graph has been built"}, status_code=400)
 
         simulation_requirement = project.simulation_requirement
         if not simulation_requirement:
-            return jsonify({
-                "success": False,
-                "error": "Missing simulation requirement description"
-            }), 400
+            return JSONResponse({"success": False, "error": "Missing simulation requirement description"}, status_code=400)
 
-        # Pre-generate report_id for immediate return to frontend
-        import uuid
         report_id = f"report_{uuid.uuid4().hex[:12]}"
 
-        # Create async task
         task_manager = TaskManager()
         task_id = task_manager.create_task(
             task_type="report_generate",
@@ -121,14 +100,12 @@ def generate_report():
             }
         )
 
-        # Initialize graph_tools in Flask context BEFORE spawning thread
-        # (current_app is not available inside background threads)
-        storage = current_app.extensions.get('neo4j_storage')
+        storage = getattr(request.app.state, 'neo4j_storage', None)
         if not storage:
-            return jsonify({"success": False, "error": "Neo4j storage not initialized"}), 503
+            return JSONResponse({"success": False, "error": "Neo4j storage not initialized"}, status_code=503)
+            
         graph_tools = GraphToolsService(storage=storage)
 
-        # Define background task
         def run_generate():
             try:
                 task_manager.update_task(
@@ -138,7 +115,6 @@ def generate_report():
                     message="Initializing Report Agent..."
                 )
 
-                # Create Report Agent
                 agent = ReportAgent(
                     graph_id=graph_id,
                     simulation_id=simulation_id,
@@ -146,7 +122,6 @@ def generate_report():
                     graph_tools=graph_tools
                 )
 
-                # Progress callback
                 def progress_callback(stage, progress, message):
                     task_manager.update_task(
                         task_id,
@@ -154,13 +129,11 @@ def generate_report():
                         message=f"[{stage}] {message}"
                     )
 
-                # Generate report (pass pre-generated report_id)
                 report = agent.generate_report(
                     progress_callback=progress_callback,
                     report_id=report_id
                 )
 
-                # Save report
                 ReportManager.save_report(report)
 
                 if report.status == ReportStatus.COMPLETED:
@@ -179,11 +152,10 @@ def generate_report():
                 logger.error(f"Report generation failed: {str(e)}")
                 task_manager.fail_task(task_id, str(e))
 
-        # Start background thread
-        thread = threading.Thread(target=run_generate, daemon=True)
-        thread.start()
+        # Using BackgroundTasks instead of threading directly
+        background_tasks.add_task(run_generate)
 
-        return jsonify({
+        return {
             "success": True,
             "data": {
                 "simulation_id": simulation_id,
@@ -193,50 +165,23 @@ def generate_report():
                 "message": "Report generation task started, query progress via /api/report/generate/status",
                 "already_generated": False
             }
-        })
+        }
 
     except Exception as e:
         logger.error(f"Failed to start report generation task: {str(e)}")
-        return jsonify({
-            "success": False,
-            "error": str(e),
-            "traceback": traceback.format_exc()
-        }), 500
+        return JSONResponse({"success": False, "error": str(e), "traceback": traceback.format_exc()}, status_code=500)
 
 
-@report_bp.route('/generate/status', methods=['POST'])
-def get_generate_status():
-    """
-    Query report generation task progress
-
-    Request (JSON):
-        {
-            "task_id": "task_xxxx",         // Optional, task_id returned by generate
-            "simulation_id": "sim_xxxx"     // Optional, simulation ID
-        }
-
-    Returns:
-        {
-            "success": true,
-            "data": {
-                "task_id": "task_xxxx",
-                "status": "processing|completed|failed",
-                "progress": 45,
-                "message": "..."
-            }
-        }
-    """
+@router.post("/generate/status")
+def get_generate_status(req: GenerateStatusRequest):
     try:
-        data = request.get_json() or {}
+        task_id = req.task_id
+        simulation_id = req.simulation_id
 
-        task_id = data.get('task_id')
-        simulation_id = data.get('simulation_id')
-
-        # If simulation_id is provided, first check if a completed report exists
         if simulation_id:
             existing_report = ReportManager.get_report_by_simulation(simulation_id)
             if existing_report and existing_report.status == ReportStatus.COMPLETED:
-                return jsonify({
+                return {
                     "success": True,
                     "data": {
                         "simulation_id": simulation_id,
@@ -246,269 +191,131 @@ def get_generate_status():
                         "message": "Report has been generated",
                         "already_completed": True
                     }
-                })
+                }
 
         if not task_id:
-            return jsonify({
-                "success": False,
-                "error": "Please provide task_id or simulation_id"
-            }), 400
+            return JSONResponse({"success": False, "error": "Please provide task_id or simulation_id"}, status_code=400)
 
         task_manager = TaskManager()
         task = task_manager.get_task(task_id)
 
         if not task:
-            return jsonify({
-                "success": False,
-                "error": f"Task not found: {task_id}"
-            }), 404
+            return JSONResponse({"success": False, "error": f"Task not found: {task_id}"}, status_code=404)
 
-        return jsonify({
-            "success": True,
-            "data": task.to_dict()
-        })
+        return {"success": True, "data": task.to_dict()}
 
     except Exception as e:
         logger.error(f"Failed to query task status: {str(e)}")
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
 
 
 # ============== Report Retrieval Endpoints ==============
 
-@report_bp.route('/<report_id>', methods=['GET'])
+@router.get("/{report_id}")
 def get_report(report_id: str):
-    """
-    Get report details
-
-    Returns:
-        {
-            "success": true,
-            "data": {
-                "report_id": "report_xxxx",
-                "simulation_id": "sim_xxxx",
-                "status": "completed",
-                "outline": {...},
-                "markdown_content": "...",
-                "created_at": "...",
-                "completed_at": "..."
-            }
-        }
-    """
     try:
         report = ReportManager.get_report(report_id)
 
         if not report:
-            return jsonify({
-                "success": False,
-                "error": f"Report not found: {report_id}"
-            }), 404
+            return JSONResponse({"success": False, "error": f"Report not found: {report_id}"}, status_code=404)
 
-        return jsonify({
-            "success": True,
-            "data": report.to_dict()
-        })
+        return {"success": True, "data": report.to_dict()}
 
     except Exception as e:
         logger.error(f"Failed to get report: {str(e)}")
-        return jsonify({
-            "success": False,
-            "error": str(e),
-            "traceback": traceback.format_exc()
-        }), 500
+        return JSONResponse({"success": False, "error": str(e), "traceback": traceback.format_exc()}, status_code=500)
 
 
-@report_bp.route('/by-simulation/<simulation_id>', methods=['GET'])
+@router.get("/by-simulation/{simulation_id}")
 def get_report_by_simulation(simulation_id: str):
-    """
-    Get report by simulation ID
-
-    Returns:
-        {
-            "success": true,
-            "data": {
-                "report_id": "report_xxxx",
-                ...
-            }
-        }
-    """
     try:
         report = ReportManager.get_report_by_simulation(simulation_id)
 
         if not report:
-            return jsonify({
+            return JSONResponse({
                 "success": False,
                 "error": f"No report available for this simulation: {simulation_id}",
                 "has_report": False
-            }), 404
+            }, status_code=404)
 
-        return jsonify({
+        return {
             "success": True,
             "data": report.to_dict(),
             "has_report": True
-        })
+        }
 
     except Exception as e:
         logger.error(f"Failed to get report: {str(e)}")
-        return jsonify({
-            "success": False,
-            "error": str(e),
-            "traceback": traceback.format_exc()
-        }), 500
+        return JSONResponse({"success": False, "error": str(e), "traceback": traceback.format_exc()}, status_code=500)
 
 
-@report_bp.route('/<report_id>/download', methods=['GET'])
+@router.get("/{report_id}/download")
 def download_report(report_id: str):
-    """
-    Download report (Markdown format)
-
-    Returns a Markdown file
-    """
     try:
         report = ReportManager.get_report(report_id)
 
         if not report:
-            return jsonify({
-                "success": False,
-                "error": f"Report not found: {report_id}"
-            }), 404
+            return JSONResponse({"success": False, "error": f"Report not found: {report_id}"}, status_code=404)
 
         md_path = ReportManager._get_report_markdown_path(report_id)
 
         if not os.path.exists(md_path):
-            # If MD file does not exist, generate a temporary file
-            import tempfile
             with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
                 f.write(report.markdown_content)
                 temp_path = f.name
+            return FileResponse(temp_path, media_type='text/markdown', filename=f"{report_id}.md")
 
-            return send_file(
-                temp_path,
-                as_attachment=True,
-                download_name=f"{report_id}.md"
-            )
-
-        return send_file(
-            md_path,
-            as_attachment=True,
-            download_name=f"{report_id}.md"
-        )
+        return FileResponse(md_path, media_type='text/markdown', filename=f"{report_id}.md")
 
     except Exception as e:
         logger.error(f"Failed to download report: {str(e)}")
-        return jsonify({
-            "success": False,
-            "error": str(e),
-            "traceback": traceback.format_exc()
-        }), 500
+        return JSONResponse({"success": False, "error": str(e), "traceback": traceback.format_exc()}, status_code=500)
 
 
-@report_bp.route('/<report_id>', methods=['DELETE'])
+@router.delete("/{report_id}")
 def delete_report(report_id: str):
-    """Delete report"""
     try:
         success = ReportManager.delete_report(report_id)
 
         if not success:
-            return jsonify({
-                "success": False,
-                "error": f"Report not found: {report_id}"
-            }), 404
+            return JSONResponse({"success": False, "error": f"Report not found: {report_id}"}, status_code=404)
 
-        return jsonify({
-            "success": True,
-            "message": f"Report deleted: {report_id}"
-        })
+        return {"success": True, "message": f"Report deleted: {report_id}"}
 
     except Exception as e:
         logger.error(f"Failed to delete report: {str(e)}")
-        return jsonify({
-            "success": False,
-            "error": str(e),
-            "traceback": traceback.format_exc()
-        }), 500
+        return JSONResponse({"success": False, "error": str(e), "traceback": traceback.format_exc()}, status_code=500)
 
 
 # ============== Report Agent Chat Endpoints ==============
 
-@report_bp.route('/chat', methods=['POST'])
-def chat_with_report_agent():
-    """
-    Chat with Report Agent
-
-    Report Agent can autonomously call retrieval tools during conversation to answer questions
-
-    Request (JSON):
-        {
-            "simulation_id": "sim_xxxx",        // Required, simulation ID
-            "message": "Please explain the trend",  // Required, user message
-            "chat_history": [                   // Optional, conversation history
-                {"role": "user", "content": "..."},
-                {"role": "assistant", "content": "..."}
-            ]
-        }
-
-    Returns:
-        {
-            "success": true,
-            "data": {
-                "response": "Agent response...",
-                "tool_calls": [list of tool calls],
-                "sources": [information sources]
-            }
-        }
-    """
+@router.post("/chat")
+def chat_with_report_agent(req: ChatRequest, request: Request):
     try:
-        data = request.get_json() or {}
+        simulation_id = req.simulation_id
+        message = req.message
+        chat_history = req.chat_history
 
-        simulation_id = data.get('simulation_id')
-        message = data.get('message')
-        chat_history = data.get('chat_history', [])
-
-        if not simulation_id:
-            return jsonify({
-                "success": False,
-                "error": "Please provide simulation_id"
-            }), 400
-
-        if not message:
-            return jsonify({
-                "success": False,
-                "error": "Please provide message"
-            }), 400
-
-        # Get simulation and project info
         manager = SimulationManager()
         state = manager.get_simulation(simulation_id)
 
         if not state:
-            return jsonify({
-                "success": False,
-                "error": f"Simulation not found: {simulation_id}"
-            }), 404
+            return JSONResponse({"success": False, "error": f"Simulation not found: {simulation_id}"}, status_code=404)
 
         project = ProjectManager.get_project(state.project_id)
         if not project:
-            return jsonify({
-                "success": False,
-                "error": f"Project not found: {state.project_id}"
-            }), 404
+            return JSONResponse({"success": False, "error": f"Project not found: {state.project_id}"}, status_code=404)
 
         graph_id = state.graph_id or project.graph_id
         if not graph_id:
-            return jsonify({
-                "success": False,
-                "error": "Missing graph ID"
-            }), 400
+            return JSONResponse({"success": False, "error": "Missing graph ID"}, status_code=400)
 
         simulation_requirement = project.simulation_requirement or ""
 
-        # Create Agent and start conversation
-        storage = current_app.extensions.get('neo4j_storage')
+        storage = getattr(request.app.state, 'neo4j_storage', None)
         if not storage:
-            return jsonify({"success": False, "error": "Neo4j storage not initialized"}), 503
+            return JSONResponse({"success": False, "error": "Neo4j storage not initialized"}, status_code=503)
+
         graph_tools = GraphToolsService(storage=storage)
 
         agent = ReportAgent(
@@ -520,54 +327,26 @@ def chat_with_report_agent():
 
         result = agent.chat(message=message, chat_history=chat_history)
 
-        return jsonify({
-            "success": True,
-            "data": result
-        })
+        return {"success": True, "data": result}
 
     except Exception as e:
         logger.error(f"Chat failed: {str(e)}")
-        return jsonify({
-            "success": False,
-            "error": str(e),
-            "traceback": traceback.format_exc()
-        }), 500
+        return JSONResponse({"success": False, "error": str(e), "traceback": traceback.format_exc()}, status_code=500)
 
-
-# ============== Report Progress and Section Endpoints ==============
 
 # ============== Report Status Check Endpoints ==============
 
-@report_bp.route('/check/<simulation_id>', methods=['GET'])
+@router.get("/check/{simulation_id}")
 def check_report_status(simulation_id: str):
-    """
-    Check if a simulation has a report and its status
-
-    Used by frontend to determine whether to unlock Interview feature
-
-    Returns:
-        {
-            "success": true,
-            "data": {
-                "simulation_id": "sim_xxxx",
-                "has_report": true,
-                "report_status": "completed",
-                "report_id": "report_xxxx",
-                "interview_unlocked": true
-            }
-        }
-    """
     try:
         report = ReportManager.get_report_by_simulation(simulation_id)
 
         has_report = report is not None
         report_status = report.status.value if report else None
         report_id = report.report_id if report else None
-
-        # Only unlock interview after report is completed
         interview_unlocked = has_report and report.status == ReportStatus.COMPLETED
 
-        return jsonify({
+        return {
             "success": True,
             "data": {
                 "simulation_id": simulation_id,
@@ -576,289 +355,92 @@ def check_report_status(simulation_id: str):
                 "report_id": report_id,
                 "interview_unlocked": interview_unlocked
             }
-        })
+        }
 
     except Exception as e:
         logger.error(f"Failed to check report status: {str(e)}")
-        return jsonify({
-            "success": False,
-            "error": str(e),
-            "traceback": traceback.format_exc()
-        }), 500
+        return JSONResponse({"success": False, "error": str(e), "traceback": traceback.format_exc()}, status_code=500)
 
 
 # ============== Agent Log Endpoints ==============
 
-@report_bp.route('/<report_id>/agent-log', methods=['GET'])
-def get_agent_log(report_id: str):
-    """
-    Get Report Agent's detailed execution log
-
-    Retrieve each step of action during report generation in real-time, including:
-    - Report start, planning start/complete
-    - Each section's start, tool calls, LLM responses, completion
-    - Report complete or failed
-
-    Query parameters:
-        from_line: Start reading from this line (optional, default 0, for incremental retrieval)
-
-    Returns:
-        {
-            "success": true,
-            "data": {
-                "logs": [
-                    {
-                        "timestamp": "2025-12-13T...",
-                        "elapsed_seconds": 12.5,
-                        "report_id": "report_xxxx",
-                        "action": "tool_call",
-                        "stage": "generating",
-                        "section_title": "Executive Summary",
-                        "section_index": 1,
-                        "details": {
-                            "tool_name": "insight_forge",
-                            "parameters": {...},
-                            ...
-                        }
-                    },
-                    ...
-                ],
-                "total_lines": 25,
-                "from_line": 0,
-                "has_more": false
-            }
-        }
-    """
+@router.get("/{report_id}/agent-log")
+def get_agent_log(report_id: str, from_line: int = 0):
     try:
-        from_line = request.args.get('from_line', 0, type=int)
-
         log_data = ReportManager.get_agent_log(report_id, from_line=from_line)
-
-        return jsonify({
-            "success": True,
-            "data": log_data
-        })
-
+        return {"success": True, "data": log_data}
     except Exception as e:
         logger.error(f"Failed to get Agent log: {str(e)}")
-        return jsonify({
-            "success": False,
-            "error": str(e),
-            "traceback": traceback.format_exc()
-        }), 500
+        return JSONResponse({"success": False, "error": str(e), "traceback": traceback.format_exc()}, status_code=500)
 
 
-@report_bp.route('/<report_id>/agent-log/stream', methods=['GET'])
+@router.get("/{report_id}/agent-log/stream")
 def stream_agent_log(report_id: str):
-    """
-    Get complete Agent log (fetch all at once)
-
-    Returns:
-        {
-            "success": true,
-            "data": {
-                "logs": [...],
-                "count": 25
-            }
-        }
-    """
     try:
         logs = ReportManager.get_agent_log_stream(report_id)
-
-        return jsonify({
-            "success": True,
-            "data": {
-                "logs": logs,
-                "count": len(logs)
-            }
-        })
-
+        return {"success": True, "data": {"logs": logs, "count": len(logs)}}
     except Exception as e:
         logger.error(f"Failed to get Agent log: {str(e)}")
-        return jsonify({
-            "success": False,
-            "error": str(e),
-            "traceback": traceback.format_exc()
-        }), 500
+        return JSONResponse({"success": False, "error": str(e), "traceback": traceback.format_exc()}, status_code=500)
 
 
 # ============== Console Log Endpoints ==============
 
-@report_bp.route('/<report_id>/console-log', methods=['GET'])
-def get_console_log(report_id: str):
-    """
-    Get Report Agent's console output log
-
-    Retrieve console output (INFO, WARNING, etc.) during report generation in real-time.
-    This differs from the structured JSON log returned by the agent-log endpoint;
-    it is plain text console-style log.
-
-    Query parameters:
-        from_line: Start reading from this line (optional, default 0, for incremental retrieval)
-
-    Returns:
-        {
-            "success": true,
-            "data": {
-                "logs": [
-                    "[19:46:14] INFO: Search complete: found 15 related facts",
-                    "[19:46:14] INFO: Graph search: graph_id=xxx, query=...",
-                    ...
-                ],
-                "total_lines": 100,
-                "from_line": 0,
-                "has_more": false
-            }
-        }
-    """
+@router.get("/{report_id}/console-log")
+def get_console_log(report_id: str, from_line: int = 0):
     try:
-        from_line = request.args.get('from_line', 0, type=int)
-
         log_data = ReportManager.get_console_log(report_id, from_line=from_line)
-
-        return jsonify({
-            "success": True,
-            "data": log_data
-        })
-
+        return {"success": True, "data": log_data}
     except Exception as e:
         logger.error(f"Failed to get console log: {str(e)}")
-        return jsonify({
-            "success": False,
-            "error": str(e),
-            "traceback": traceback.format_exc()
-        }), 500
+        return JSONResponse({"success": False, "error": str(e), "traceback": traceback.format_exc()}, status_code=500)
 
 
-@report_bp.route('/<report_id>/console-log/stream', methods=['GET'])
+@router.get("/{report_id}/console-log/stream")
 def stream_console_log(report_id: str):
-    """
-    Get complete console log (fetch all at once)
-
-    Returns:
-        {
-            "success": true,
-            "data": {
-                "logs": [...],
-                "count": 100
-            }
-        }
-    """
     try:
         logs = ReportManager.get_console_log_stream(report_id)
-
-        return jsonify({
-            "success": True,
-            "data": {
-                "logs": logs,
-                "count": len(logs)
-            }
-        })
-
+        return {"success": True, "data": {"logs": logs, "count": len(logs)}}
     except Exception as e:
         logger.error(f"Failed to get console log: {str(e)}")
-        return jsonify({
-            "success": False,
-            "error": str(e),
-            "traceback": traceback.format_exc()
-        }), 500
+        return JSONResponse({"success": False, "error": str(e), "traceback": traceback.format_exc()}, status_code=500)
 
 
 # ============== Tool Call Endpoints (for debugging) ==============
 
-@report_bp.route('/tools/search', methods=['POST'])
-def search_graph_tool():
-    """
-    Graph search tool endpoint (for debugging)
-
-    Request (JSON):
-        {
-            "graph_id": "miroshark_xxxx",
-            "query": "search query",
-            "limit": 10
-        }
-    """
+@router.post("/tools/search")
+def search_graph_tool(req: ToolSearchRequest, request: Request):
     try:
-        data = request.get_json() or {}
-
-        graph_id = data.get('graph_id')
-        query = data.get('query')
-        limit = data.get('limit', 10)
-
-        if not graph_id or not query:
-            return jsonify({
-                "success": False,
-                "error": "Please provide graph_id and query"
-            }), 400
-
-        from flask import current_app
-        from ..services.graph_tools import GraphToolsService
-
-        storage = current_app.extensions.get('neo4j_storage')
+        storage = getattr(request.app.state, 'neo4j_storage', None)
         if not storage:
-            return jsonify({"success": False, "error": "Neo4j storage is not initialized"}), 503
+            return JSONResponse({"success": False, "error": "Neo4j storage is not initialized"}, status_code=503)
 
         tools = GraphToolsService(storage=storage)
         result = tools.search_graph(
-            graph_id=graph_id,
-            query=query,
-            limit=limit
+            graph_id=req.graph_id,
+            query=req.query,
+            limit=req.limit
         )
 
-        return jsonify({
-            "success": True,
-            "data": result.to_dict()
-        })
+        return {"success": True, "data": result.to_dict()}
 
     except Exception as e:
         logger.error(f"Graph search failed: {str(e)}")
-        return jsonify({
-            "success": False,
-            "error": str(e),
-            "traceback": traceback.format_exc()
-        }), 500
+        return JSONResponse({"success": False, "error": str(e), "traceback": traceback.format_exc()}, status_code=500)
 
 
-@report_bp.route('/tools/statistics', methods=['POST'])
-def get_graph_statistics_tool():
-    """
-    Graph statistics tool endpoint (for debugging)
-
-    Request (JSON):
-        {
-            "graph_id": "miroshark_xxxx"
-        }
-    """
+@router.post("/tools/statistics")
+def get_graph_statistics_tool(req: ToolStatisticsRequest, request: Request):
     try:
-        data = request.get_json() or {}
-
-        graph_id = data.get('graph_id')
-
-        if not graph_id:
-            return jsonify({
-                "success": False,
-                "error": "Please provide graph_id"
-            }), 400
-
-        from flask import current_app
-        from ..services.graph_tools import GraphToolsService
-
-        storage = current_app.extensions.get('neo4j_storage')
+        storage = getattr(request.app.state, 'neo4j_storage', None)
         if not storage:
-            return jsonify({"success": False, "error": "Neo4j storage is not initialized"}), 503
+            return JSONResponse({"success": False, "error": "Neo4j storage is not initialized"}, status_code=503)
 
         tools = GraphToolsService(storage=storage)
-        result = tools.get_graph_statistics(graph_id)
+        result = tools.get_graph_statistics(req.graph_id)
 
-        return jsonify({
-            "success": True,
-            "data": result
-        })
+        return {"success": True, "data": result}
 
     except Exception as e:
         logger.error(f"Failed to get graph statistics: {str(e)}")
-        return jsonify({
-            "success": False,
-            "error": str(e),
-            "traceback": traceback.format_exc()
-        }), 500
+        return JSONResponse({"success": False, "error": str(e), "traceback": traceback.format_exc()}, status_code=500)

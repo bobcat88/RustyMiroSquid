@@ -14,7 +14,6 @@
 """Polymarket agent environment — what the agent sees each turn."""
 from __future__ import annotations
 
-import json
 
 from wonderwall.simulations.base import BaseEnvironment
 

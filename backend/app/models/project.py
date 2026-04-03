@@ -4,13 +4,13 @@ Used for server-side persistent project state, avoiding large data transfers bet
 """
 
 import os
-import json
+import orjson
 import uuid
 import shutil
 from datetime import datetime
 from typing import Dict, Any, List, Optional
 from enum import Enum
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, field
 from ..config import Config
 
 
@@ -171,7 +171,7 @@ class ProjectManager:
         meta_path = cls._get_project_meta_path(project.project_id)
 
         with open(meta_path, 'w', encoding='utf-8') as f:
-            json.dump(project.to_dict(), f, ensure_ascii=False, indent=2)
+            f.write(orjson.dumps(project.to_dict(), option=orjson.OPT_INDENT_2).decode())
 
     @classmethod
     def get_project(cls, project_id: str) -> Optional[Project]:
@@ -190,7 +190,7 @@ class ProjectManager:
             return None
 
         with open(meta_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
+            data = orjson.loads(f.read())
 
         return Project.from_dict(data)
 
@@ -244,7 +244,7 @@ class ProjectManager:
 
         Args:
             project_id: Project ID
-            file_storage: Flask FileStorage object
+            file_storage: FastAPI UploadFile object
             original_filename: Original filename
 
         Returns:

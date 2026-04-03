@@ -37,8 +37,8 @@ Usage in the simulation loop:
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
@@ -166,6 +166,10 @@ class RoundRecord:
 class RoundMemory:
     """Sliding-window round memory with LLM compaction.
 
+    Thread-safe (No-GIL): protège _rounds et _ancient_summary via Lock.
+    Les accès concurrents surviennent quand plusieurs plateformes
+    record() en parallèle dans des threads séparés.
+
     Args:
         llm_client: An LLM client with a .chat(messages, temperature) method.
         minutes_per_round: Simulated minutes per round (for time labels).
@@ -179,6 +183,7 @@ class RoundMemory:
         minutes_per_round: int = 60,
         compact_batch_size: int = 6,
     ):
+        self._lock = threading.Lock()  # No-GIL thread safety
         self.llm = llm_client
         self.minutes_per_round = minutes_per_round
         self.compact_batch_size = compact_batch_size
@@ -191,23 +196,25 @@ class RoundMemory:
         self._pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="compact")
 
     def start_round(self, round_num: int, simulated_day: int, simulated_hour: int):
-        """Initialize a new round record."""
-        if round_num not in self._rounds:
-            self._rounds[round_num] = RoundRecord(
-                round_num=round_num,
-                simulated_day=simulated_day,
-                simulated_hour=simulated_hour,
-            )
+        """Initialize a new round record. Thread-safe."""
+        with self._lock:
+            if round_num not in self._rounds:
+                self._rounds[round_num] = RoundRecord(
+                    round_num=round_num,
+                    simulated_day=simulated_day,
+                    simulated_hour=simulated_hour,
+                )
 
     def record(self, platform: str, round_num: int, actions: List[Dict[str, Any]]):
-        """Record actions from one platform for a round.
+        """Record actions from one platform for a round. Thread-safe.
 
         Call this after each platform steps, BEFORE the next platform steps,
         so that subsequent platforms see what happened.
         """
-        if round_num not in self._rounds:
-            self._rounds[round_num] = RoundRecord(round_num=round_num)
-        self._rounds[round_num].platform_actions[platform] = actions
+        with self._lock:
+            if round_num not in self._rounds:
+                self._rounds[round_num] = RoundRecord(round_num=round_num)
+            self._rounds[round_num].platform_actions[platform] = actions
 
     # ── Context building ─────────────────────────────────────────
 

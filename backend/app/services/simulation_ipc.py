@@ -1,15 +1,15 @@
 """
 Simulation IPC Communication Module
-Used for inter-process communication between Flask backend and simulation scripts
+Used for inter-process communication between FastAPI backend and simulation scripts
 
 Implements a simple command/response pattern via the filesystem:
-1. Flask writes commands to the commands/ directory
+1. FastAPI writes commands to the commands/ directory
 2. The simulation script polls the commands directory, executes commands, and writes responses to the responses/ directory
-3. Flask polls the responses directory to obtain results
+3. FastAPI polls the responses directory to obtain results
 """
 
 import os
-import json
+import orjson
 import time
 import uuid
 from typing import Dict, Any, Optional, List
@@ -146,7 +146,7 @@ class SimulationIPCClient:
         # Write command file
         command_file = os.path.join(self.commands_dir, f"{command_id}.json")
         with open(command_file, 'w', encoding='utf-8') as f:
-            json.dump(command.to_dict(), f, ensure_ascii=False, indent=2)
+            f.write(orjson.dumps(command.to_dict(), option=orjson.OPT_INDENT_2).decode())
         
         logger.info(f"Sent IPC command: {command_type.value}, command_id={command_id}")
 
@@ -158,7 +158,7 @@ class SimulationIPCClient:
             if os.path.exists(response_file):
                 try:
                     with open(response_file, 'r', encoding='utf-8') as f:
-                        response_data = json.load(f)
+                        response_data = orjson.loads(f.read())
                     response = IPCResponse.from_dict(response_data)
                     
                     # Clean up command and response files
@@ -170,7 +170,7 @@ class SimulationIPCClient:
                     
                     logger.info(f"Received IPC response: command_id={command_id}, status={response.status.value}")
                     return response
-                except (json.JSONDecodeError, KeyError) as e:
+                except (orjson.JSONDecodeError, KeyError) as e:
                     logger.warning(f"Failed to parse response: {e}")
             
             time.sleep(poll_interval)
@@ -279,7 +279,7 @@ class SimulationIPCClient:
 
         try:
             with open(status_file, 'r', encoding='utf-8') as f:
-                status = json.load(f)
+                status = orjson.loads(f.read())
             if status.get("status") != "alive":
                 # Status says not alive — but check if the process is actually
                 # running (handles race where old process overwrites new status)
@@ -292,7 +292,7 @@ class SimulationIPCClient:
                         pass  # PID is dead
                 return False
             return True
-        except (json.JSONDecodeError, OSError):
+        except (orjson.JSONDecodeError, OSError):
             return False
 
 
@@ -362,9 +362,9 @@ class SimulationIPCServer:
         for filepath, _ in command_files:
             try:
                 with open(filepath, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
+                    data = orjson.loads(f.read())
                 return IPCCommand.from_dict(data)
-            except (json.JSONDecodeError, KeyError, OSError) as e:
+            except (orjson.JSONDecodeError, KeyError, OSError) as e:
                 logger.warning(f"Failed to read command file: {filepath}, {e}")
                 continue
         
@@ -379,7 +379,7 @@ class SimulationIPCServer:
         """
         response_file = os.path.join(self.responses_dir, f"{response.command_id}.json")
         with open(response_file, 'w', encoding='utf-8') as f:
-            json.dump(response.to_dict(), f, ensure_ascii=False, indent=2)
+            f.write(orjson.dumps(response.to_dict(), option=orjson.OPT_INDENT_2).decode())
         
         # Delete command file
         command_file = os.path.join(self.commands_dir, f"{response.command_id}.json")

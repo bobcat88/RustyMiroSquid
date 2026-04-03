@@ -4,7 +4,7 @@ Unified API calls using OpenAI format.
 Supports OpenAI-compatible APIs and Claude Code CLI.
 """
 
-import json
+import orjson
 import os
 import re
 from typing import Optional, Dict, Any, List
@@ -157,6 +157,6 @@ class LLMClient:
         cleaned_response = cleaned_response.strip()
 
         try:
-            return json.loads(cleaned_response)
-        except json.JSONDecodeError:
+            return orjson.loads(cleaned_response)
+        except orjson.JSONDecodeError:
             raise ValueError(f"Invalid JSON format returned by LLM: {cleaned_response}")

@@ -5,7 +5,7 @@ Test Twitter + Polymarket simulation (5 rounds, all 3 platforms).
 Reuses the graph + config from previous runs.
 """
 
-import json
+import orjson
 import os
 import sys
 import time
@@ -47,11 +47,11 @@ def setup_simulation():
 
     # Load config from phase 5
     with open(os.path.join(OUT_DIR, '05_simulation_config.json')) as f:
-        config = json.load(f)
+        config = orjson.loads(f.read())
 
     # Load profiles from phase 4
     with open(os.path.join(OUT_DIR, '04_profiles.json')) as f:
-        phase4_profiles = json.load(f)
+        phase4_profiles = orjson.loads(f.read())
     profile_lookup = {p['name'].lower(): p for p in phase4_profiles}
 
     agent_configs = config.get('agent_configs', [])
@@ -93,7 +93,7 @@ def setup_simulation():
         })
 
     with open(os.path.join(SIM_DIR, 'reddit_profiles.json'), 'w') as f:
-        json.dump(reddit_profiles, f, ensure_ascii=False, indent=2)
+        f.write(orjson.dumps(reddit_profiles, option=orjson.OPT_INDENT_2).decode())
     print(f"  Reddit profiles: {len(reddit_profiles)}")
 
     # ── Twitter profiles (CSV) ──
@@ -138,7 +138,7 @@ def setup_simulation():
         })
 
     with open(os.path.join(SIM_DIR, 'polymarket_profiles.json'), 'w') as f:
-        json.dump(polymarket_profiles, f, ensure_ascii=False, indent=2)
+        f.write(orjson.dumps(polymarket_profiles, option=orjson.OPT_INDENT_2).decode())
     print(f"  Polymarket profiles: {len(polymarket_profiles)}")
 
     # ── Add Polymarket markets to config ──
@@ -162,8 +162,8 @@ def setup_simulation():
     # Save config
     config_path = os.path.join(SIM_DIR, 'simulation_config.json')
     with open(config_path, 'w') as f:
-        json.dump(config, f, ensure_ascii=False, indent=2)
-    print(f"  Config saved")
+        f.write(orjson.dumps(config, option=orjson.OPT_INDENT_2).decode())
+    print("  Config saved")
 
     return config_path
 
@@ -229,7 +229,7 @@ def analyze_results():
             continue
 
         with open(actions_path) as f:
-            all_lines = [json.loads(l) for l in f if l.strip()]
+            all_lines = [orjson.loads(l) for l in f if l.strip()]
 
         # Separate metadata from real actions
         actions = [a for a in all_lines if 'action_type' in a]
@@ -239,7 +239,7 @@ def analyze_results():
         types = Counter(a['action_type'] for a in actions)
 
         print(f"\n  [{platform.upper()}] {len(actions)} actions, {len(metadata)} metadata events")
-        print(f"  Action breakdown:")
+        print("  Action breakdown:")
         for t, c in types.most_common():
             print(f"    {t}: {c}")
 
@@ -294,7 +294,7 @@ def analyze_results():
         conn = sqlite3.connect(pm_db)
         conn.row_factory = sqlite3.Row
 
-        print(f"\n  [POLYMARKET MARKETS]")
+        print("\n  [POLYMARKET MARKETS]")
         for row in conn.execute("SELECT * FROM market"):
             ra, rb = row['reserve_a'], row['reserve_b']
             total = ra + rb
@@ -302,7 +302,7 @@ def analyze_results():
             print(f"    #{row['market_id']}: \"{row['question']}\"")
             print(f"      YES: ${price_yes:.3f}, trades: {conn.execute('SELECT COUNT(*) FROM trade WHERE market_id=?', (row['market_id'],)).fetchone()[0]}")
 
-        print(f"\n  [POLYMARKET PORTFOLIOS]")
+        print("\n  [POLYMARKET PORTFOLIOS]")
         for row in conn.execute("SELECT p.user_id, p.balance, u.user_name FROM portfolio p JOIN user u ON p.user_id = u.user_id"):
             print(f"    {row['user_name']}: ${row['balance']:.2f}")
 
@@ -311,7 +311,7 @@ def analyze_results():
 
 def main():
     print(f"\n{'#'*60}")
-    print(f"  MiroShark — Full 3-Platform Simulation Test")
+    print("  MiroShark — Full 3-Platform Simulation Test")
     print(f"  Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"{'#'*60}")
 

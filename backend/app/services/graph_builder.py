@@ -10,7 +10,6 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, Any, List, Optional, Callable
 from dataclasses import dataclass
 
-from ..config import Config
 from ..models.task import TaskManager, TaskStatus
 from ..storage import GraphStorage
 from .text_processor import TextProcessor
@@ -230,7 +229,7 @@ class GraphBuilderService:
                 )
 
             # Process chunks within this batch in parallel
-            with ThreadPoolExecutor(max_workers=batch_size) as pool:
+            with ThreadPoolExecutor(max_workers=min(batch_size, Config.MAX_WORKERS)) as pool:
                 futures = {}
                 for j, chunk in enumerate(batch_chunks):
                     if not chunk or not chunk.strip():

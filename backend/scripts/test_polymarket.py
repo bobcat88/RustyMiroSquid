@@ -9,7 +9,7 @@ Usage:
     python test_polymarket.py
 """
 import asyncio
-import json
+import orjson
 import os
 import sys
 import shutil
@@ -152,7 +152,7 @@ async def main():
         with open(actions_file, 'r') as f:
             for line in f:
                 try:
-                    data = json.loads(line)
+                    data = orjson.loads(line)
                     if "event_type" in data:
                         print(f"  [{data['event_type']}] round={data.get('round', '-')}")
                     elif "action_type" in data:
@@ -170,7 +170,7 @@ async def main():
                             if 'outcome' in args:
                                 detail += f' {args["outcome"]}'
                         print(f"  [{agent}] {action}{detail}")
-                except json.JSONDecodeError:
+                except orjson.JSONDecodeError:
                     pass
 
     # Close env

@@ -12,7 +12,6 @@ Log structure:
     └── run_state.json       # Run state (for API queries)
 """
 
-import json
 import os
 import logging
 from datetime import datetime
@@ -63,7 +62,7 @@ class PlatformActionLogger:
         }
         
         with open(self.log_path, 'a', encoding='utf-8') as f:
-            f.write(json.dumps(entry, ensure_ascii=False) + '\n')
+            f.write(orjson.dumps(entry).decode() + '\n')
     
     def log_round_start(self, round_num: int, simulated_hour: int):
         """Log round start"""
@@ -75,7 +74,7 @@ class PlatformActionLogger:
         }
         
         with open(self.log_path, 'a', encoding='utf-8') as f:
-            f.write(json.dumps(entry, ensure_ascii=False) + '\n')
+            f.write(orjson.dumps(entry, option=orjson.OPT_NON_STR_KEYS).decode() + '\n')
     
     def log_round_end(self, round_num: int, actions_count: int):
         """Log round end"""
@@ -87,7 +86,7 @@ class PlatformActionLogger:
         }
         
         with open(self.log_path, 'a', encoding='utf-8') as f:
-            f.write(json.dumps(entry, ensure_ascii=False) + '\n')
+            f.write(orjson.dumps(entry).decode() + '\n')
     
     def log_simulation_start(self, config: Dict[str, Any]):
         """Log simulation start"""
@@ -100,7 +99,7 @@ class PlatformActionLogger:
         }
         
         with open(self.log_path, 'a', encoding='utf-8') as f:
-            f.write(json.dumps(entry, ensure_ascii=False) + '\n')
+            f.write(orjson.dumps(entry).decode() + '\n')
     
     def log_simulation_end(self, total_rounds: int, total_actions: int):
         """Log simulation end"""
@@ -113,7 +112,7 @@ class PlatformActionLogger:
         }
         
         with open(self.log_path, 'a', encoding='utf-8') as f:
-            f.write(json.dumps(entry, ensure_ascii=False) + '\n')
+            f.write(orjson.dumps(entry).decode() + '\n')
 
 
 class SimulationLogManager:
@@ -244,7 +243,7 @@ class ActionLogger:
         }
         
         with open(self.log_path, 'a', encoding='utf-8') as f:
-            f.write(json.dumps(entry, ensure_ascii=False) + '\n')
+            f.write(orjson.dumps(entry).decode() + '\n')
     
     def log_round_start(self, round_num: int, simulated_hour: int, platform: str):
         entry = {
@@ -256,7 +255,7 @@ class ActionLogger:
         }
         
         with open(self.log_path, 'a', encoding='utf-8') as f:
-            f.write(json.dumps(entry, ensure_ascii=False) + '\n')
+            f.write(orjson.dumps(entry).decode() + '\n')
     
     def log_round_end(self, round_num: int, actions_count: int, platform: str):
         entry = {
@@ -268,7 +267,7 @@ class ActionLogger:
         }
         
         with open(self.log_path, 'a', encoding='utf-8') as f:
-            f.write(json.dumps(entry, ensure_ascii=False) + '\n')
+            f.write(orjson.dumps(entry).decode() + '\n')
     
     def log_simulation_start(self, platform: str, config: Dict[str, Any]):
         entry = {
@@ -280,7 +279,7 @@ class ActionLogger:
         }
         
         with open(self.log_path, 'a', encoding='utf-8') as f:
-            f.write(json.dumps(entry, ensure_ascii=False) + '\n')
+            f.write(orjson.dumps(entry).decode() + '\n')
     
     def log_simulation_end(self, platform: str, total_rounds: int, total_actions: int):
         entry = {
@@ -292,7 +291,7 @@ class ActionLogger:
         }
         
         with open(self.log_path, 'a', encoding='utf-8') as f:
-            f.write(json.dumps(entry, ensure_ascii=False) + '\n')
+            f.write(orjson.dumps(entry).decode() + '\n')
 
 
 # Global logger instance (legacy interface compatibility)

@@ -9,7 +9,7 @@ Usage:
     .venv/bin/python scripts/test_pipeline_phase5_6.py
 """
 
-import json
+import orjson
 import os
 import sys
 import time
@@ -39,7 +39,7 @@ SIMULATION_REQUIREMENT = (
 def save_json(name, data):
     path = os.path.join(OUT_DIR, f'{name}.json')
     with open(path, 'w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+        f.write(orjson.dumps(data, option=orjson.OPT_INDENT_2).decode())
     print(f"  → Saved: {path}")
 
 
@@ -114,7 +114,7 @@ def phase5_config(graph_id, document_text):
     # SimulationParameters has a to_dict method
     config = result.to_dict() if hasattr(result, 'to_dict') else result
 
-    print(f"\n  Time config:")
+    print("\n  Time config:")
     tc = config.get('time_config', {})
     print(f"    Total hours: {tc.get('total_simulation_hours')}")
     print(f"    Minutes per round: {tc.get('minutes_per_round')}")
@@ -125,7 +125,7 @@ def phase5_config(graph_id, document_text):
               f"stance={ac.get('stance')}, sentiment={ac.get('sentiment_bias')}, "
               f"influence={ac.get('influence_weight')}")
 
-    print(f"  Event config:")
+    print("  Event config:")
     ec = config.get('event_config', {})
     posts = ec.get('initial_posts', [])
     print(f"    Initial posts: {len(posts)}")
@@ -176,7 +176,7 @@ def phase6_simulation(config, storage, graph_id):
     phase4_profiles = []
     if os.path.exists(profiles_from_phase4):
         with open(profiles_from_phase4) as f:
-            phase4_profiles = json.load(f)
+            phase4_profiles = orjson.loads(f.read())
         print(f"  Loaded {len(phase4_profiles)} profiles from Phase 4")
 
     # Build profile lookup by name
@@ -206,18 +206,18 @@ def phase6_simulation(config, storage, graph_id):
 
     profiles_path = os.path.join(sim_dir, 'reddit_profiles.json')
     with open(profiles_path, 'w') as f:
-        json.dump(reddit_profiles, f, ensure_ascii=False, indent=2)
+        f.write(orjson.dumps(reddit_profiles, option=orjson.OPT_INDENT_2).decode())
     print(f"  Wrote {len(reddit_profiles)} Reddit profiles")
 
     # Save config
     config_path = os.path.join(sim_dir, 'simulation_config.json')
     config['simulation_requirement'] = SIMULATION_REQUIREMENT
     with open(config_path, 'w') as f:
-        json.dump(config, f, ensure_ascii=False, indent=2)
-    print(f"  Wrote simulation config")
+        f.write(orjson.dumps(config, option=orjson.OPT_INDENT_2).decode())
+    print("  Wrote simulation config")
 
     # Run Reddit-only simulation (simplest, no CSV needed)
-    print(f"\n  Starting Reddit-only simulation (3 rounds)...")
+    print("\n  Starting Reddit-only simulation (3 rounds)...")
     print(f"  Config: {len(agent_configs)} agents, 3 rounds, 60 min/round")
 
     import subprocess
@@ -261,7 +261,7 @@ def phase6_simulation(config, storage, graph_id):
     actions_path = os.path.join(sim_dir, 'reddit', 'actions.jsonl')
     if os.path.exists(actions_path):
         with open(actions_path) as f:
-            actions = [json.loads(line) for line in f if line.strip()]
+            actions = [orjson.loads(line) for line in f if line.strip()]
         print(f"\n  Actions logged: {len(actions)}")
 
         # Analyze actions
@@ -281,11 +281,11 @@ def phase6_simulation(config, storage, graph_id):
                 })
 
         print(f"  Agents active: {len(agents_active)}")
-        print(f"  Action breakdown:")
+        print("  Action breakdown:")
         for at, count in sorted(action_types.items(), key=lambda x: -x[1]):
             print(f"    {at}: {count}")
 
-        print(f"\n  Sample posts:")
+        print("\n  Sample posts:")
         for p in posts[:5]:
             print(f"    [R{p['round']}] {p['agent']}: {p['content'][:150]}")
 
@@ -310,7 +310,7 @@ def phase6_simulation(config, storage, graph_id):
 
 def main():
     print(f"\n{'#'*60}")
-    print(f"  MiroShark Pipeline Test — Phases 5-6")
+    print("  MiroShark Pipeline Test — Phases 5-6")
     print(f"  Model: {Config.LLM_MODEL_NAME}")
     print(f"  Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"{'#'*60}")
@@ -322,7 +322,7 @@ def main():
         sys.exit(1)
 
     with open(stats_path) as f:
-        graph_stats = json.load(f)
+        graph_stats = orjson.loads(f.read())
     graph_id = graph_stats['graph_id']
     print(f"  Reusing graph: {graph_id} ({graph_stats['node_count']} nodes, {graph_stats['edge_count']} edges)")
 

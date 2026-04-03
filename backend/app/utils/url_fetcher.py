@@ -9,7 +9,7 @@ import ipaddress
 from html.parser import HTMLParser
 from urllib.parse import urlparse
 
-import requests
+import httpx
 
 MAX_RESPONSE_BYTES = 5 * 1024 * 1024  # 5 MB
 
@@ -104,7 +104,7 @@ def _validate_url(url: str) -> str:
     return host
 
 
-def _safe_get(url: str, headers: dict, timeout: int) -> requests.Response:
+def _safe_get(url: str, headers: dict, timeout: int) -> httpx.Response:
     """
     GET with manual redirect following — each hop is IP-checked to prevent
     SSRF via redirect to internal addresses. Also streams the response and
@@ -116,34 +116,26 @@ def _safe_get(url: str, headers: dict, timeout: int) -> requests.Response:
     for _ in range(max_redirects + 1):
         _validate_url(current_url)
 
-        resp = requests.get(
-            current_url, headers=headers, timeout=timeout,
-            allow_redirects=False, stream=True,
-        )
-
-        if resp.is_redirect and 'location' in resp.headers:
-            current_url = resp.headers['location']
-            resp.close()
-            continue
-
-        resp.raise_for_status()
-
-        # Enforce size limit while streaming
         chunks = []
         downloaded = 0
-        for chunk in resp.iter_content(chunk_size=64 * 1024):
-            downloaded += len(chunk)
-            if downloaded > MAX_RESPONSE_BYTES:
-                resp.close()
-                raise ValueError(
-                    f"Response exceeds {MAX_RESPONSE_BYTES // (1024 * 1024)} MB size limit"
-                )
-            chunks.append(chunk)
-        resp.close()
+        with httpx.stream("GET", current_url, headers=headers, timeout=timeout) as stream_resp:
+            if stream_resp.is_redirect and 'location' in stream_resp.headers:
+                current_url = stream_resp.headers['location']
+                continue
 
-        # Reconstruct a response-like object with the full content
-        resp._content = b''.join(chunks)
-        return resp
+            stream_resp.raise_for_status()
+
+            for chunk in stream_resp.iter_bytes(chunk_size=64 * 1024):
+                downloaded += len(chunk)
+                if downloaded > MAX_RESPONSE_BYTES:
+                    raise ValueError(
+                        f"Response exceeds {MAX_RESPONSE_BYTES // (1024 * 1024)} MB size limit"
+                    )
+                chunks.append(chunk)
+
+            resp = httpx.Response(status_code=200, content=b''.join(chunks), headers=stream_resp.headers)
+            resp.request = stream_resp.request
+            return resp
 
     raise ValueError("Too many redirects")
 
@@ -165,7 +157,7 @@ def fetch_url_text(url: str, timeout: int = 15) -> dict:
 
     Raises:
         ValueError: For invalid URLs, blocked addresses, or unextractable content.
-        requests.exceptions.RequestException: For HTTP/network errors.
+        httpx.RequestError: For HTTP/network errors.
     """
     _validate_url(url)
 

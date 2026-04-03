@@ -7,7 +7,7 @@ Note: Each call spawns a subprocess (~2-5s overhead), so this is best
 suited for low-volume workloads (report generation, small simulations).
 """
 
-import json
+import orjson
 import os
 import re
 import subprocess
@@ -125,9 +125,9 @@ class ClaudeCodeClient:
 
         # Parse the JSON output from claude --output-format json
         try:
-            output = json.loads(result.stdout)
+            output = orjson.loads(result.stdout)
             content = output.get("result", result.stdout)
-        except json.JSONDecodeError:
+        except orjson.JSONDecodeError:
             # Fallback: treat raw stdout as the response
             content = result.stdout.strip()
 
@@ -166,6 +166,6 @@ class ClaudeCodeClient:
         cleaned = cleaned.strip()
 
         try:
-            return json.loads(cleaned)
-        except json.JSONDecodeError:
+            return orjson.loads(cleaned)
+        except orjson.JSONDecodeError:
             raise ValueError(f"Invalid JSON from Claude Code: {cleaned[:200]}")

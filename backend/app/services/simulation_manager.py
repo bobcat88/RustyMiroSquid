@@ -5,18 +5,16 @@ Uses preset scripts + LLM-powered configuration parameter generation
 """
 
 import os
-import json
-import shutil
+import orjson
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 
-from ..config import Config
 from ..utils.logger import get_logger
-from .entity_reader import EntityReader, FilteredEntities
-from .oasis_profile_generator import OasisProfileGenerator, OasisAgentProfile
-from .simulation_config_generator import SimulationConfigGenerator, SimulationParameters
+from .entity_reader import EntityReader
+from .oasis_profile_generator import OasisProfileGenerator
+from .simulation_config_generator import SimulationConfigGenerator
 
 logger = get_logger('miroshark.simulation')
 
@@ -151,7 +149,7 @@ class SimulationManager:
         state.updated_at = datetime.now().isoformat()
         
         with open(state_file, 'w', encoding='utf-8') as f:
-            json.dump(state.to_dict(), f, ensure_ascii=False, indent=2)
+            f.write(orjson.dumps(state.to_dict(), option=orjson.OPT_INDENT_2).decode())
         
         self._simulations[state.simulation_id] = state
     
@@ -167,7 +165,7 @@ class SimulationManager:
             return None
         
         with open(state_file, 'r', encoding='utf-8') as f:
-            data = json.load(f)
+            data = orjson.loads(f.read())
         
         state = SimulationState(
             simulation_id=simulation_id,
@@ -510,7 +508,7 @@ class SimulationManager:
             return []
         
         with open(profile_path, 'r', encoding='utf-8') as f:
-            return json.load(f)
+            return orjson.loads(f.read())
     
     def get_simulation_config(self, simulation_id: str) -> Optional[Dict[str, Any]]:
         """Get simulation config"""
@@ -521,7 +519,7 @@ class SimulationManager:
             return None
         
         with open(config_path, 'r', encoding='utf-8') as f:
-            return json.load(f)
+            return orjson.loads(f.read())
     
     def get_run_instructions(self, simulation_id: str) -> Dict[str, str]:
         """Get run instructions"""

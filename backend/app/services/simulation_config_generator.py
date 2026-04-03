@@ -11,7 +11,7 @@ Uses a step-by-step generation strategy to avoid failure from generating overly 
 4. Generate platform configuration
 """
 
-import json
+import orjson
 import math
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, Any, List, Optional, Callable
@@ -214,7 +214,7 @@ class SimulationParameters:
 
     def to_json(self, indent: int = 2) -> str:
         """Convert to JSON string"""
-        return json.dumps(self.to_dict(), ensure_ascii=False, indent=indent)
+        return orjson.dumps(self.to_dict(), ensure_ascii=False, indent=indent)
 
 
 class SimulationConfigGenerator:
@@ -345,7 +345,7 @@ class SimulationConfigGenerator:
 
         report_progress(3, f"Generating Agent configs ({num_batches} batches, {max_parallel_batches} parallel)...")
 
-        with ThreadPoolExecutor(max_workers=max_parallel_batches) as pool:
+        with ThreadPoolExecutor(max_workers=min(max_parallel_batches, Config.MAX_WORKERS)) as pool:
             futures = {pool.submit(_gen_batch, bi): bi for bi in range(num_batches)}
             # Collect results in order
             results_by_idx = {}
@@ -473,7 +473,6 @@ class SimulationConfigGenerator:
 
     def _call_llm_with_retry(self, prompt: str, system_prompt: str) -> Dict[str, Any]:
         """LLM call with retry, includes JSON fix logic"""
-        import re
 
         max_attempts = 3
         last_error = None
@@ -492,8 +491,8 @@ class SimulationConfigGenerator:
 
                 # Try to parse JSON
                 try:
-                    return json.loads(content)
-                except json.JSONDecodeError as e:
+                    return orjson.loads(content)
+                except orjson.JSONDecodeError as e:
                     logger.warning(f"JSON parsing failed (attempt {attempt+1}): {str(e)[:80]}")
 
                     # Try to fix JSON
@@ -551,13 +550,13 @@ class SimulationConfigGenerator:
             json_str = re.sub(r'"[^"\\]*(?:\\.[^"\\]*)*"', fix_string, json_str)
 
             try:
-                return json.loads(json_str)
+                return orjson.loads(json_str)
             except:
                 # Try removing all control characters
                 json_str = re.sub(r'[\x00-\x1f\x7f-\x9f]', ' ', json_str)
                 json_str = re.sub(r'\s+', ' ', json_str)
                 try:
-                    return json.loads(json_str)
+                    return orjson.loads(json_str)
                 except:
                     pass
 
@@ -938,7 +937,7 @@ Generate ONE prediction market that best captures the central question of this s
             logger.warning(f"Prediction market generation failed: {e}")
             # Fallback: derive a market from the simulation requirement
             return [{
-                "question": f"Will the scenario described have a net positive public reaction?",
+                "question": "Will the scenario described have a net positive public reaction?",
                 "outcome_a": "YES",
                 "outcome_b": "NO",
                 "initial_probability": 0.55,
@@ -971,7 +970,7 @@ Simulation requirement: {simulation_requirement}
 
 ## Entity List
 ```json
-{json.dumps(entity_list, ensure_ascii=False, indent=2)}
+{ororjson.dumps(entity_list, option=orjson.OPT_INDENT_2).decode()}
 ```
 
 ## Task

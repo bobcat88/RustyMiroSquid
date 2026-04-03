@@ -14,9 +14,16 @@ which models real-world information lag between markets and social media.
 
 from __future__ import annotations
 
+import logging
 import sqlite3
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.services.market_connector import MarketConnector
+    from app.services.sentiment_velocity import SentimentVelocityTracker
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -127,8 +134,21 @@ class SentimentSnapshot:
 class MarketMediaBridge:
     """Shared state enabling feedback between prediction markets and social media.
 
+    Combines:
+    - Simulated Polymarket prediction market data
+    - Real-time market data from MarketConnector (Binance/yfinance)
+    - Sentiment velocity signals from SentimentVelocityTracker
+
     Usage:
+        # Sans données réelles (backward compatible)
         bridge = MarketMediaBridge()
+
+        # Avec données réelles
+        from app.services.market_connector import MarketConnector
+        from app.services.sentiment_velocity import SentimentVelocityTracker
+        connector = MarketConnector()
+        velocity = SentimentVelocityTracker()
+        bridge = MarketMediaBridge(market_connector=connector, velocity_tracker=velocity)
 
         # In Polymarket loop, after each round:
         bridge.update_prices(polymarket_db_path, round_num)
@@ -145,10 +165,17 @@ class MarketMediaBridge:
         inject_sentiment_context(agent, prompt)
     """
 
-    def __init__(self):
+    def __init__(
+        self,
+        market_connector: Optional['MarketConnector'] = None,
+        velocity_tracker: Optional['SentimentVelocityTracker'] = None,
+    ):
         self.latest_prices: Optional[MarketSnapshot] = None
         self.latest_sentiment: Optional[SentimentSnapshot] = None
         self._price_history: List[MarketSnapshot] = []
+        # Connecteurs de données réelles (optionnels)
+        self._market_connector = market_connector
+        self._velocity_tracker = velocity_tracker
 
     # ── Polymarket → Social Media ──────────────────────────────
 
@@ -200,14 +227,31 @@ class MarketMediaBridge:
             self._price_history.append(snapshot)
             self.latest_prices = snapshot
 
-        except Exception as e:
+        except Exception:
             pass  # Non-critical — simulation continues without price broadcast
 
     def get_market_prompt(self) -> str:
-        """Called by Twitter/Reddit loops to get current market prices for agent injection."""
-        if not self.latest_prices or not self.latest_prices.markets:
-            return ""
-        return self.latest_prices.to_social_media_prompt()
+        """Called by Twitter/Reddit loops to get market prices for agent injection.
+
+        Combines simulated Polymarket prices with real-time market data
+        from MarketConnector (if available).
+        """
+        parts = []
+
+        # 1. Simulated Polymarket data
+        if self.latest_prices and self.latest_prices.markets:
+            parts.append(self.latest_prices.to_social_media_prompt())
+
+        # 2. Real market data from MarketConnector
+        if self._market_connector:
+            try:
+                real_prompt = self._market_connector.to_agent_prompt()
+                if real_prompt:
+                    parts.append(real_prompt)
+            except Exception as e:
+                logger.warning(f"MarketConnector prompt failed: {e}")
+
+        return "\n\n".join(parts)
 
     # ── Social Media → Polymarket ──────────────────────────────
 
@@ -279,10 +323,59 @@ class MarketMediaBridge:
         )
 
     def get_sentiment_prompt(self) -> str:
-        """Called by Polymarket loop to get social media sentiment for trader injection."""
-        if not self.latest_sentiment:
-            return ""
-        return self.latest_sentiment.to_trading_prompt()
+        """Called by Polymarket loop to get sentiment for trader injection.
+
+        Combines social media sentiment with velocity signals (if available).
+        """
+        parts = []
+
+        # 1. Social media sentiment from simulation
+        if self.latest_sentiment:
+            parts.append(self.latest_sentiment.to_trading_prompt())
+
+        # 2. Sentiment velocity signals from SentimentVelocityTracker
+        if self._velocity_tracker:
+            try:
+                velocity_prompt = self._velocity_tracker.to_agent_prompt()
+                if velocity_prompt:
+                    parts.append(velocity_prompt)
+            except Exception as e:
+                logger.warning(f"VelocityTracker prompt failed: {e}")
+
+        return "\n\n".join(parts)
+
+    # ── Real Market Data Helpers ────────────────────────────────
+
+    def refresh_real_market_data(self):
+        """Fetch latest real market data from MarketConnector (yfinance batch).
+
+        Call this once per round to update equities/ETF prices.
+        Crypto data arrives automatically via WebSocket.
+        """
+        if self._market_connector:
+            try:
+                self._market_connector.fetch_equities_batch()
+                logger.info("Real market data refreshed")
+            except Exception as e:
+                logger.warning(f"Real market data refresh failed: {e}")
+
+    def record_velocity(
+        self,
+        agent_id: int,
+        agent_name: str,
+        topic: str,
+        position: float,
+        round_num: int,
+    ):
+        """Record a belief position for sentiment velocity tracking."""
+        if self._velocity_tracker:
+            self._velocity_tracker.record_position(
+                agent_id=agent_id,
+                agent_name=agent_name,
+                topic=topic,
+                position=position,
+                round_num=round_num,
+            )
 
 
 # ── Injection helpers (same pattern as cross_platform_digest) ──

@@ -7,7 +7,7 @@ Validates:
 
 import os
 import sys
-import json
+import orjson
 import csv
 import tempfile
 
@@ -81,7 +81,7 @@ def test_profile_formats():
         print(f"   File: {twitter_path}")
         print(f"   Rows: {len(rows)}")
         print(f"   Headers: {list(rows[0].keys())}")
-        print(f"\n   Sample data (row 1):")
+        print("\n   Sample data (row 1):")
         for key, value in rows[0].items():
             print(f"     {key}: {value}")
 
@@ -92,7 +92,7 @@ def test_profile_formats():
         if missing:
             print(f"\n   [ERROR] Missing fields: {missing}")
         else:
-            print(f"\n   [PASS] All required fields are present")
+            print("\n   [PASS] All required fields are present")
 
         # Test Reddit JSON format
         print("\n2. Test Reddit Profile (detailed JSON format)")
@@ -101,13 +101,13 @@ def test_profile_formats():
 
         # Read and validate JSON
         with open(reddit_path, 'r', encoding='utf-8') as f:
-            reddit_data = json.load(f)
+            reddit_data = orjson.loads(f.read())
 
         print(f"   File: {reddit_path}")
         print(f"   Entries: {len(reddit_data)}")
         print(f"   Fields: {list(reddit_data[0].keys())}")
-        print(f"\n   Sample data (entry 1):")
-        print(json.dumps(reddit_data[0], ensure_ascii=False, indent=4))
+        print("\n   Sample data (entry 1):")
+        print(ororjson.dumps(reddit_data[0], option=orjson.OPT_INDENT_2).decode())
 
         # Validate detailed format fields
         required_reddit_fields = ['realname', 'username', 'bio', 'persona']
@@ -117,7 +117,7 @@ def test_profile_formats():
         if missing:
             print(f"\n   [ERROR] Missing required fields: {missing}")
         else:
-            print(f"\n   [PASS] All required fields are present")
+            print("\n   [PASS] All required fields are present")
 
         present_optional = set(optional_reddit_fields) & set(reddit_data[0].keys())
         print(f"   [INFO] Optional fields: {present_optional}")
@@ -156,7 +156,7 @@ def show_expected_formats():
             "interested_topics": ["Economics", "Business"]
         }
     ]
-    print(json.dumps(reddit_example, ensure_ascii=False, indent=2))
+    print(ororjson.dumps(reddit_example, option=orjson.OPT_INDENT_2).decode())
 
 
 if __name__ == "__main__":

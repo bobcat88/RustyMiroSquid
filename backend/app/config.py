@@ -16,13 +16,26 @@ else:
     # If no .env in root directory, try loading environment variables (for production)
     load_dotenv(override=True)
 
+# Resource limits (applied before any heavy imports)
+import multiprocessing
+MAX_CPU_USAGE_PCT = float(os.environ.get('MAX_CPU_USAGE_PCT', '75.0'))
+SYSTEM_CORES = multiprocessing.cpu_count() or 4
+# Target workers: e.g., 8 cores * 0.75 = 6 workers
+DEFAULT_MAX_WORKERS = max(1, int(SYSTEM_CORES * (MAX_CPU_USAGE_PCT / 100.0)))
+
+# Limit Polars (Rust-core) parallelization
+os.environ["POLARS_MAX_THREADS"] = str(DEFAULT_MAX_WORKERS)
+
 
 class Config:
-    """Flask configuration class"""
+    """Application configuration class"""
 
-    # Flask configuration
+    # Backend configuration
     SECRET_KEY = os.environ.get('SECRET_KEY', 'miroshark-secret-key')
-    DEBUG = os.environ.get('FLASK_DEBUG', 'True').lower() == 'true'
+    DEBUG = os.environ.get('FASTAPI_DEBUG', 'True').lower() == 'true'
+    
+    # Resource limits
+    MAX_WORKERS = int(os.environ.get('MAX_WORKERS', str(DEFAULT_MAX_WORKERS)))
     
     # JSON configuration - disable ASCII escaping, display non-ASCII characters directly (instead of \uXXXX format)
     JSON_AS_ASCII = False

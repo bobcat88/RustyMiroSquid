@@ -5,7 +5,7 @@ Test report generation on the interconnected simulation results.
 Uses the graph + simulation data from the previous test run.
 """
 
-import json
+import orjson
 import os
 import sys
 import time
@@ -36,13 +36,13 @@ def banner(title):
 
 def main():
     print(f"\n{'#'*60}")
-    print(f"  Report Generation Test")
+    print("  Report Generation Test")
     print(f"  {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"{'#'*60}")
 
     # Load graph ID from previous run
     with open(os.path.join(OUT_DIR, '03_graph_stats.json')) as f:
-        graph_stats = json.load(f)
+        graph_stats = orjson.loads(f.read())
     graph_id = graph_stats['graph_id']
     print(f"  Graph: {graph_id} ({graph_stats['node_count']} nodes, {graph_stats['edge_count']} edges)")
 
@@ -112,7 +112,7 @@ def main():
         log_path = os.path.join(report_dir, 'agent_log.jsonl')
         if os.path.exists(log_path):
             with open(log_path) as f:
-                log_lines = [json.loads(l) for l in f if l.strip()]
+                log_lines = [orjson.loads(l) for l in f if l.strip()]
             print(f"\n  Agent log: {len(log_lines)} entries")
             tool_calls = [l for l in log_lines if l.get('type') == 'tool_call']
             tool_types = {}

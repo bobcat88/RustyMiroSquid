@@ -1,7 +1,13 @@
+# ===================================================================
+# RustyMiroSquid — Docker Compose
+# Services: Neo4j, Redis, Ollama, App (+ vLLM optionnel)
+# ===================================================================
+
 services:
+  # ===== Neo4j — Knowledge Graph =====
   neo4j:
     image: neo4j:5.15-community
-    container_name: miroshark-neo4j
+    container_name: squid-neo4j
     environment:
       - NEO4J_AUTH=neo4j/miroshark
     ports:
@@ -10,25 +16,47 @@ services:
     volumes:
       - neo4j_data:/data
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "cypher-shell", "-u", "neo4j", "-p", "miroshark", "RETURN 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
+  # ===== Redis — Semantic Cache =====
+  redis:
+    image: redis:7-alpine
+    container_name: squid-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # ===== Ollama — Local LLM Inference =====
   ollama:
     image: ollama/ollama:latest
-    container_name: miroshark-ollama
+    container_name: squid-ollama
     ports:
       - "11434:11434"
     volumes:
       - ollama_data:/root/.ollama
     restart: unless-stopped
 
-  miroshark:
-    image: ghcr.io/aaronjmars/miroshark:latest
-    # Mirror image (replace the address above if pulling is slow)
-    # image: ghcr.nju.edu.cn/aaronjmars/miroshark:latest
-    container_name: miroshark
+  # ===== RustyMiroSquid — Main Application =====
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: squid-app
     environment:
       - LLM_API_KEY=ollama
       - LLM_BASE_URL=http://ollama:11434/v1
-      - LLM_MODEL_NAME=qwen2.5:32b
+      - LLM_MODEL_NAME=qwen3.5:27b
       - NEO4J_URI=bolt://neo4j:7687
       - NEO4J_USER=neo4j
       - NEO4J_PASSWORD=miroshark
@@ -36,16 +64,89 @@ services:
       - EMBEDDING_BASE_URL=http://ollama:11434
       - OPENAI_API_KEY=ollama
       - OPENAI_API_BASE_URL=http://ollama:11434/v1
+      - REDIS_URL=redis://redis:6379
+      - PYTHON_GIL=0
     ports:
       - "3000:3000"
       - "5001:5001"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.80'  # Limite à 80% du CPU total pour préserver la stabilité
     depends_on:
-      - neo4j
-      - ollama
+      neo4j:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      ollama:
+        condition: service_started
     restart: unless-stopped
     volumes:
       - ./backend/uploads:/app/backend/uploads
 
+  # =================================================================
+  # GPU INFERENCE — Décommenter UN SEUL bloc selon votre hardware
+  # =================================================================
+
+  # ===== Option A: NVIDIA GPU (CUDA) — vLLM Speculative Decoding =====
+  # Nécessite: NVIDIA GPU avec ≥24GB VRAM + nvidia-container-toolkit
+  # vllm-nvidia:
+  #   image: vllm/vllm-openai:latest
+  #   container_name: squid-vllm
+  #   runtime: nvidia
+  #   environment:
+  #     - NVIDIA_VISIBLE_DEVICES=all
+  #   command: >
+  #     --model Qwen/Qwen3.5-35B
+  #     --speculative-model Qwen/Qwen3-0.5B
+  #     --num-speculative-tokens 5
+  #     --port 8000
+  #   ports:
+  #     - "8000:8000"
+  #   volumes:
+  #     - vllm_cache:/root/.cache/huggingface
+  #   restart: unless-stopped
+
+  # ===== Option B: AMD GPU (ROCm) — vLLM avec support ROCm =====
+  # Nécessite: AMD GPU (RX 7900 XTX, MI250, MI300X) + ROCm 6.x installé
+  # vllm-amd:
+  #   image: vllm/vllm-openai:latest  # ou rocm/vllm:latest si disponible
+  #   container_name: squid-vllm
+  #   devices:
+  #     - /dev/kfd:/dev/kfd
+  #     - /dev/dri:/dev/dri
+  #   group_add:
+  #     - video
+  #     - render
+  #   environment:
+  #     - HSA_OVERRIDE_GFX_VERSION=11.0.0  # Ajuster selon votre GPU
+  #     - HIP_VISIBLE_DEVICES=0
+  #   command: >
+  #     --model Qwen/Qwen3.5-35B
+  #     --speculative-model Qwen/Qwen3-0.5B
+  #     --num-speculative-tokens 5
+  #     --port 8000
+  #   ports:
+  #     - "8000:8000"
+  #   volumes:
+  #     - vllm_cache:/root/.cache/huggingface
+  #   restart: unless-stopped
+
+  # ===== Option C: Apple Silicon (Metal) — Ollama natif =====
+  # Sur Mac M1/M2/M3/M4, vLLM n'est pas supporté.
+  # Utiliser Ollama (déjà défini ci-dessus) avec accélération Metal native.
+  # L'image Docker Ollama détecte automatiquement Metal sur macOS.
+  # Pour optimiser sur Mac :
+  #   1. Installer Ollama nativement (brew install ollama) — plus performant que Docker
+  #   2. Commenter le service 'ollama' Docker ci-dessus
+  #   3. Mettre LLM_BASE_URL=http://host.docker.internal:11434/v1 dans le .env
+  #   4. Modèles recommandés pour Apple Silicon :
+  #      - qwen3.5:27b (M3 Pro+ avec 36GB RAM)
+  #      - qwen3.5:14b (M2 Pro avec 16GB RAM)
+  #      - qwen3:8b (M1 avec 8GB RAM)
+
 volumes:
   neo4j_data:
+  redis_data:
   ollama_data:
+  # vllm_cache:  # Décommenter si Option A ou B activée

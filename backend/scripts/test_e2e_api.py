@@ -17,11 +17,11 @@ Pipeline:
     Phase 7: Retrieve report                   GET  /api/report/{report_id}
 """
 
-import json
+import orjson
 import os
 import sys
 import time
-import requests
+import httpx
 from datetime import datetime
 
 # ── Configuration ──
@@ -91,7 +91,7 @@ def fail(msg):
 def save_json(name, data):
     path = os.path.join(OUT_DIR, f'{name}.json')
     with open(path, 'w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+        f.write(orjson.dumps(data, option=orjson.OPT_INDENT_2).decode())
     info(f"Saved: {path}")
 
 
@@ -99,10 +99,11 @@ def api(method, path, **kwargs):
     """Make an API call, return parsed JSON. Fail on HTTP errors."""
     url = f"{BASE_URL}{path}"
     try:
-        resp = requests.request(method, url, timeout=300, **kwargs)
-    except requests.ConnectionError:
+        with httpx.Client(timeout=300) as client:
+            resp = client.request(method, url, **kwargs)
+    except httpx.ConnectError:
         fail(f"Cannot connect to {url} — is the backend running?")
-    except requests.Timeout:
+    except httpx.TimeoutException:
         fail(f"Request timed out: {method} {path}")
 
     try:
@@ -306,7 +307,7 @@ def phase4_prepare(simulation_id):
         body={'task_id': task_id, 'simulation_id': simulation_id}
     )
 
-    ok(f"Preparation complete")
+    ok("Preparation complete")
     ok(f"Time: {time.time()-t0:.1f}s")
 
     # Fetch profiles and config for verification
@@ -437,7 +438,7 @@ def phase7_retrieve_report(report_id):
 
 def main():
     print(f"\n{Colors.BOLD}{'#'*60}")
-    print(f"  MiroShark — End-to-End API Test")
+    print("  MiroShark — End-to-End API Test")
     print(f"  API: {BASE_URL}")
     print(f"  PDF: {os.path.basename(PDF_PATH)}")
     print(f"  Rounds: {MAX_SIM_ROUNDS}")
@@ -448,9 +449,9 @@ def main():
 
     # Preflight: check server is up
     try:
-        requests.get(f"{BASE_URL}/api/graph/project/nonexistent", timeout=15)
+        httpx.get(f"{BASE_URL}/api/graph/project/nonexistent", timeout=15)
         ok(f"Backend reachable at {BASE_URL}")
-    except (requests.ConnectionError, requests.Timeout):
+    except (httpx.ConnectError, httpx.TimeoutException):
         fail(f"Backend not reachable at {BASE_URL} — start it with: cd backend && uv run python run.py")
 
     total_t0 = time.time()
@@ -479,7 +480,7 @@ def main():
     # ── Summary ──
     total_elapsed = time.time() - total_t0
     print(f"\n{Colors.BOLD}{'='*60}")
-    print(f"  END-TO-END TEST COMPLETE")
+    print("  END-TO-END TEST COMPLETE")
     print(f"{'='*60}{Colors.RESET}")
     ok(f"Total time: {total_elapsed:.1f}s ({total_elapsed/60:.1f} min)")
     ok(f"Project:    {project_id}")
@@ -487,7 +488,7 @@ def main():
     ok(f"Simulation: {simulation_id}")
     ok(f"Report:     {report_id}")
     print()
-    ok(f"Output files:")
+    ok("Output files:")
     for f in sorted(os.listdir(OUT_DIR)):
         size = os.path.getsize(os.path.join(OUT_DIR, f))
         info(f"  {f} ({size:,} bytes)")

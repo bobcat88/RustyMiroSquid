@@ -15,7 +15,7 @@ Usage:
 
 import argparse
 import asyncio
-import json
+import orjson
 import logging
 import os
 import random
@@ -33,7 +33,6 @@ from wonderwall.social_agent.belief_state import (
 from wonderwall.social_agent.round_analyzer import (
     RoundAnalyzer,
     SimulationTrajectory,
-    update_trust_from_actions,
 )
 
 # Global variables: used for signal handling
@@ -195,8 +194,8 @@ class IPCHandler:
         for filepath, _ in command_files:
             try:
                 with open(filepath, 'r', encoding='utf-8') as f:
-                    return json.load(f)
-            except (json.JSONDecodeError, OSError):
+                    return orjson.loads(f.read())
+            except (orjson.JSONDecodeError, OSError):
                 continue
         
         return None
@@ -213,7 +212,7 @@ class IPCHandler:
         
         response_file = os.path.join(self.responses_dir, f"{command_id}.json")
         with open(response_file, 'w', encoding='utf-8') as f:
-            json.dump(response, f, ensure_ascii=False, indent=2)
+            f.write(orjson.dumps(response, option=orjson.OPT_INDENT_2).decode())
         
         # Delete command file
         command_file = os.path.join(self.commands_dir, f"{command_id}.json")
@@ -338,10 +337,10 @@ class IPCHandler:
             if row:
                 user_id, info_json, created_at = row
                 try:
-                    info = json.loads(info_json) if info_json else {}
+                    info = orjson.loads(info_json) if info_json else {}
                     result["response"] = info.get("response", info)
                     result["timestamp"] = created_at
-                except json.JSONDecodeError:
+                except orjson.JSONDecodeError:
                     result["response"] = info_json
             
             conn.close()
@@ -437,7 +436,7 @@ class RedditSimulationRunner:
     def _load_config(self) -> Dict[str, Any]:
         """Load configuration file"""
         with open(self.config_path, 'r', encoding='utf-8') as f:
-            return json.load(f)
+            return orjson.loads(f.read())
     
     def _get_profile_path(self) -> str:
         """Get Profile file path"""
@@ -610,7 +609,7 @@ class RedditSimulationRunner:
             if total_rounds < original_rounds:
                 print(f"\nRounds truncated: {original_rounds} -> {total_rounds} (max_rounds={max_rounds})")
         
-        print(f"\nSimulation parameters:")
+        print("\nSimulation parameters:")
         print(f"  - Total simulation duration: {total_hours} hours")
         print(f"  - Time per round: {minutes_per_round} minutes")
         print(f"  - Total rounds: {total_rounds}")
@@ -724,7 +723,7 @@ class RedditSimulationRunner:
                       f"- elapsed: {elapsed:.1f}s")
         
         total_elapsed = (datetime.now() - start_time).total_seconds()
-        print(f"\nSimulation loop completed!")
+        print("\nSimulation loop completed!")
         print(f"  - Total elapsed: {total_elapsed:.1f}s")
         print(f"  - Database: {db_path}")
 
@@ -733,7 +732,7 @@ class RedditSimulationRunner:
             trajectory_path = os.path.join(self.simulation_dir, "trajectory.json")
             self.trajectory.save(trajectory_path)
             print(f"  - Belief trajectory: {trajectory_path}")
-            print(f"  - Convergence: {json.dumps(self.trajectory._compute_convergence(), indent=2)}")
+            print(f"  - Convergence: {orjson.dumps(self.trajectory._compute_convergence(), indent=2)}")
         
         # Whether to enter command waiting mode
         if self.wait_for_commands:

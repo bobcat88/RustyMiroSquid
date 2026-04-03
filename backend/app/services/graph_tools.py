@@ -10,7 +10,7 @@ Core Retrieval Tools (Optimized):
 3. QuickSearch (Simple Search) - Quick retrieval
 """
 
-import json
+import orjson
 import os
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass, field
@@ -170,27 +170,27 @@ class InsightForgeResult:
     def to_text(self) -> str:
         """Convert to detailed text format for LLM understanding"""
         text_parts = [
-            f"## Future Prediction Deep Analysis",
+            "## Future Prediction Deep Analysis",
             f"Analysis Query: {self.query}",
             f"Prediction Scenario: {self.simulation_requirement}",
-            f"\n### Prediction Data Statistics",
+            "\n### Prediction Data Statistics",
             f"- Related Prediction Facts: {self.total_facts}",
             f"- Involved Entities: {self.total_entities}",
             f"- Relationship Chains: {self.total_relationships}"
         ]
 
         if self.sub_queries:
-            text_parts.append(f"\n### Analysis Sub-Questions")
+            text_parts.append("\n### Analysis Sub-Questions")
             for i, sq in enumerate(self.sub_queries, 1):
                 text_parts.append(f"{i}. {sq}")
 
         if self.semantic_facts:
-            text_parts.append(f"\n### Key Facts (Please quote these verbatim in the report)")
+            text_parts.append("\n### Key Facts (Please quote these verbatim in the report)")
             for i, fact in enumerate(self.semantic_facts, 1):
                 text_parts.append(f'{i}. "{fact}"')
 
         if self.entity_insights:
-            text_parts.append(f"\n### Core Entities")
+            text_parts.append("\n### Core Entities")
             for entity in self.entity_insights:
                 text_parts.append(f"- **{entity.get('name', 'Unknown')}** ({entity.get('type', 'Entity')})")
                 if entity.get('summary'):
@@ -199,7 +199,7 @@ class InsightForgeResult:
                     text_parts.append(f"  Related Facts: {len(entity.get('related_facts', []))} facts")
 
         if self.relationship_chains:
-            text_parts.append(f"\n### Relationship Chains")
+            text_parts.append("\n### Relationship Chains")
             for chain in self.relationship_chains:
                 text_parts.append(f"- {chain}")
 
@@ -240,9 +240,9 @@ class PanoramaResult:
     def to_text(self) -> str:
         """Convert to text format (complete version, no truncation)"""
         text_parts = [
-            f"## Breadth Search Results (Future Panoramic View)",
+            "## Breadth Search Results (Future Panoramic View)",
             f"Query: {self.query}",
-            f"\n### Statistics",
+            "\n### Statistics",
             f"- Total Nodes: {self.total_nodes}",
             f"- Total Edges: {self.total_edges}",
             f"- Current Valid Facts: {self.active_count}",
@@ -250,17 +250,17 @@ class PanoramaResult:
         ]
 
         if self.active_facts:
-            text_parts.append(f"\n### Current Valid Facts (Simulation Results Verbatim)")
+            text_parts.append("\n### Current Valid Facts (Simulation Results Verbatim)")
             for i, fact in enumerate(self.active_facts, 1):
                 text_parts.append(f'{i}. "{fact}"')
 
         if self.historical_facts:
-            text_parts.append(f"\n### Historical/Expired Facts (Evolution Record)")
+            text_parts.append("\n### Historical/Expired Facts (Evolution Record)")
             for i, fact in enumerate(self.historical_facts, 1):
                 text_parts.append(f'{i}. "{fact}"')
 
         if self.all_nodes:
-            text_parts.append(f"\n### Involved Entities")
+            text_parts.append("\n### Involved Entities")
             for node in self.all_nodes:
                 entity_type = next((la for la in node.labels if la not in ["Entity", "Node"]), "Entity")
                 text_parts.append(f"- **{node.name}** ({entity_type})")
@@ -1310,12 +1310,12 @@ Return the sub-questions as a JSON list."""
             return response
         import re as _re
         try:
-            data = json.loads(text)
+            data = orjson.loads(text)
             if isinstance(data, dict) and 'arguments' in data:
                 for key in ('content', 'text', 'body', 'message', 'reply'):
                     if key in data['arguments']:
                         return str(data['arguments'][key])
-        except (json.JSONDecodeError, KeyError, TypeError):
+        except (orjson.JSONDecodeError, KeyError, TypeError):
             match = _re.search(r'"content"\s*:\s*"((?:[^"\\]|\\.)*)"', text)
             if match:
                 return match.group(1).replace('\\n', '\n').replace('\\"', '"')
@@ -1464,7 +1464,7 @@ Return the sub-questions as a JSON list."""
         if os.path.exists(reddit_profile_path):
             try:
                 with open(reddit_profile_path, 'r', encoding='utf-8') as f:
-                    profiles = json.load(f)
+                    profiles = orjson.loads(f.read())
                 logger.info(f"Loaded {len(profiles)} profiles from reddit_profiles.json")
                 return profiles
             except Exception as e:
@@ -1532,7 +1532,7 @@ Simulation Background:
 {simulation_requirement if simulation_requirement else "Not provided"}
 
 Available Agent List ({len(agent_summaries)} total):
-{json.dumps(agent_summaries, ensure_ascii=False, indent=2)}
+{ororjson.dumps(agent_summaries, option=orjson.OPT_INDENT_2).decode()}
 
 Please select up to {max_agents} most suitable Agents for interview and explain your selection rationale."""
 
@@ -1633,11 +1633,11 @@ Please select up to {max_agents} most suitable Agents for interview and explain 
                         if not line:
                             continue
                         try:
-                            entry = json.loads(line)
+                            entry = orjson.loads(line)
                             aid = entry.get("agent_id")
                             if aid is not None and aid in agent_set and entry.get("action_type"):
                                 counts[aid] = counts.get(aid, 0) + 1
-                        except (json.JSONDecodeError, KeyError):
+                        except (orjson.JSONDecodeError, KeyError):
                             continue
             except Exception as e:
                 logger.warning(f"Failed to read {platform_name} actions for platform detection: {e}")

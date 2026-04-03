@@ -1,60 +1,74 @@
 <p align="center">
-  <img src="./docs/images/miroshark.jpg" alt="MiroShark" width="120" />
+  <img src="./docs/images/rustymirosquid.png" alt="RustyMiroSquid" width="120" />
 </p>
 
-<h1 align="center">MiroShark</h1>
+<h1 align="center">🐙 RustyMiroSquid</h1>
 
 <p align="center">
-  <strong>Universal Swarm Intelligence Engine — Run Locally or with Any Cloud API</strong><br>
-  Multi-agent simulation engine: upload any document (press release, policy draft, financial report), and it generates hundreds of AI agents with unique personalities that simulate public reaction on social media — posts, arguments, opinion shifts — hour by hour.
-</p>
-
-<p align="center">
-  <img src="./docs/images/miroshark.gif" alt="MiroShark Demo" />
+  <strong>High-Performance Multi-Agent Investment Simulation Engine</strong><br>
+  Fork of <a href="https://github.com/aaronjmars/MiroShark">MiroShark</a> — mutated for predictive investment analysis with Rust-native data processing, Python Free-threading, and real-time market integration.
 </p>
 
 <p align="center">
-  <img src="./docs/images/diagram1.jpg" alt="Diagram 1" />
+  <img src="./docs/images/miroshark.gif" alt="RustyMiroSquid Demo" />
 </p>
 
-<p align="center">
-  <img src="./docs/images/diagram2.jpg" alt="Diagram 2" />
-</p>
+---
+
+## What Changed from MiroShark?
+
+RustyMiroSquid takes MiroShark's multi-agent simulation engine and transforms it into a **quantitative investment analysis tool**. The core simulation (Twitter + Reddit + Polymarket agents reacting to documents) is preserved, but everything around it is rebuilt for performance and financial use cases.
+
+### Architecture Comparison
+
+| Layer | MiroShark | RustyMiroSquid |
+|---|---|---|
+| **Python** | 3.11 (GIL-locked) | 3.13+ → 3.15 (Free-threaded, No-GIL) |
+| **Package Manager** | pip + npm | UV (Astral) + Bun (Oven) |
+| **JSON** | stdlib `json` | `orjson` (Rust-native, 10x faster) |
+| **Data Processing** | pandas + Python loops | Polars (Rust-native LazyFrames) |
+| **Validation** | dict-based | Pydantic v2 (Rust-core) |
+| **Threading** | asyncio only | asyncio (I/O) + ThreadPoolExecutor (CPU) |
+| **Token Optimization** | None | LLMLingua compression + Redis semantic cache |
+| **Market Data** | None | Binance WebSocket + YFinance snapshots |
+| **Sentiment Analysis** | Static per-round | Sentiment Velocity (dS/dt first derivative) |
+
+### New Modules
+
+```
+backend/app/services/
+├── polars_analytics.py      # Rust-native simulation analytics
+├── prompt_compressor.py     # LLMLingua token reduction (40% savings)
+├── semantic_cache.py        # Redis-backed reasoning cache
+├── market_connector.py      # Real-time WebSocket market feeds
+└── sentiment_velocity.py    # First derivative of agent opinion shifts
+```
+
+### Performance Targets
+
+| Metric | MiroShark | RustyMiroSquid Target |
+|---|---|---|
+| JSON serialization | stdlib (1x) | orjson (10x) |
+| Data processing | pandas (1x) | Polars (5-50x) |
+| CPU utilization | Single-core (GIL) | All cores (No-GIL) |
+| Token cost | Baseline | -40% (LLMLingua + cache) |
+| Agent count | ~50 | 1000+ |
 
 ---
 
 ## How It Works
 
-1. **Graph Build** — Extracts entities and relationships from your document into a Neo4j knowledge graph. NER uses few-shot examples and rejection rules to filter garbage entities. Chunk processing is parallelized with batched Neo4j writes (UNWIND).
-2. **Agent Setup** — Generates personas grounded in the knowledge graph. Each entity gets 5 layers of context: graph attributes, relationships, semantic search, related nodes, and LLM-powered web research (auto-triggers for public figures or when graph context is thin). Individual vs. institutional personas are detected automatically via keyword matching.
-3. **Simulation** — All three platforms (Twitter, Reddit, Polymarket) run simultaneously via `asyncio.gather`. A single LLM-generated prediction market with non-50/50 starting price drives Polymarket trading. Agents see cross-platform context: traders read Twitter/Reddit posts, social media agents see market prices. A sliding-window round memory compacts old rounds via background LLM calls. Belief states track stance, confidence, and trust per agent with heuristic updates each round.
-4. **Report** — A ReACT agent writes analytical reports using `simulation_feed` (actual posts/comments/trades), `market_state` (prices/P&L), graph search, and belief trajectory tools. Reports cite what agents actually said and how markets moved.
-5. **Interaction** — Chat directly with any agent via persona chat, or send questions to groups. Click any agent to view their full profile and simulation history.
+The simulation engine is inherited from MiroShark. RustyMiroSquid adds investment-specific capabilities on top:
 
-## Screenshots
+1. **Graph Build** — Extracts entities and relationships from financial documents into a Neo4j knowledge graph. NER uses few-shot examples and rejection rules. Chunk processing is parallelized with batched Neo4j writes (UNWIND).
+2. **Agent Setup** — Generates investor personas grounded in the knowledge graph. Each entity gets 5 layers of context: graph attributes, relationships, semantic search, related nodes, and LLM-powered web research.
+3. **Simulation** — Twitter, Reddit, and Polymarket run simultaneously via `asyncio.gather` (I/O) + `ThreadPoolExecutor` (CPU). Agents see cross-platform context. Belief states track stance, confidence, and trust per agent.
+4. **Market Integration** — Live price feeds from Binance (crypto) and YFinance (equities) enrich agent prompts. Sentiment velocity tracks the speed of opinion shifts.
+5. **Report** — A ReACT agent writes analytical reports citing actual agent posts, market movements, and belief trajectories.
 
-<div align="center">
-<table>
-<tr>
-<td><img src="./docs/images/1.jpg" width="100%"/></td>
-<td><img src="./docs/images/2.jpg" width="100%"/></td>
-</tr>
-<tr>
-<td><img src="./docs/images/3.jpg" width="100%"/></td>
-<td><img src="./docs/images/4.jpg" width="100%"/></td>
-</tr>
-<tr>
-<td><img src="./docs/images/5.jpg" width="100%"/></td>
-<td><img src="./docs/images/6.jpg" width="100%"/></td>
-</tr>
-</table>
-</div>
+---
 
 ## Architecture
-
-### Cross-Platform Simulation Engine
-
-All three platforms execute simultaneously each round. Data flows between them:
 
 ```
                     ┌─────────────────────────────────────────┐
@@ -76,7 +90,7 @@ All three platforms execute simultaneously each round. Data flows between them:
                     │         Market-Media Bridge              │
                     │  Social sentiment → trader prompts       │
                     │  Market prices → social media prompts    │
-                    │  Social posts → trader observation       │
+                    │  Live Binance/YFinance → enrichment      │
                     └──────┬──────────┬──────────┬────────────┘
                            │          │          │
                     ┌──────▼──────────▼──────────▼────────────┐
@@ -84,90 +98,22 @@ All three platforms execute simultaneously each round. Data flows between them:
                     │  Positions: topic → stance (-1 to +1)    │
                     │  Confidence: topic → certainty (0 to 1)  │
                     │  Trust: agent → trust level (0 to 1)     │
+                    │  Velocity: dS/dt sentiment derivative    │
                     └─────────────────────────────────────────┘
 ```
 
-### Polymarket Integration
-
-A single prediction market is generated by the LLM during config creation, tailored to the simulation's core question. The AMM uses constant-product pricing with non-50/50 initial prices based on the LLM's probability estimate. Traders see actual Twitter/Reddit posts in their observation prompt alongside portfolio and market data.
-
-### Performance
-
-| Optimization | Before | After |
-|---|---|---|
-| Neo4j writes | 1 transaction per entity | Batched UNWIND (10x faster) |
-| Chunk processing | Sequential | Parallel ThreadPoolExecutor (3x faster) |
-| Config generation | Sequential batches | Parallel batches (3x faster) |
-| Platform execution | Twitter+Reddit parallel, Polymarket sequential | All 3 parallel |
-| Memory compaction | Blocking | Background thread |
-
-### Web Enrichment
-
-When generating personas for public figures (politicians, CEOs, founders) or when graph context is thin (<150 chars), the system makes an LLM research call to enrich the profile with real-world data. Set `WEB_SEARCH_MODEL=perplexity/sonar-pro` in `.env` for grounded web search via OpenRouter.
+---
 
 ## Quick Start
 
 ### Prerequisites
 
-- An OpenAI-compatible API key *(including OpenRouter, OpenAI, Anthropic, etc.)*, Ollama for local inference, **or** Claude Code CLI
-- Python 3.11+, Node.js 18+, Neo4j 5.15+ **or** Docker & Docker Compose
+- Python 3.13+ (installed via UV)
+- Bun (replaces npm)
+- Neo4j 5.15+ **or** Docker
+- An OpenAI-compatible API key, Ollama, **or** Claude Code CLI
 
----
-
-### Option A: Cloud API (no GPU needed)
-
-Only Neo4j runs locally. LLM and embeddings use a cloud provider.
-
-```bash
-# 1. Start Neo4j (or: brew install neo4j && brew services start neo4j)
-docker run -d --name neo4j \
-  -p 7474:7474 -p 7687:7687 \
-  -e NEO4J_AUTH=neo4j/miroshark \
-  neo4j:5.15-community
-
-# 2. Configure
-cp .env.example .env
-```
-
-Edit `.env` (example using OpenRouter):
-
-```bash
-LLM_API_KEY=sk-or-v1-your-key
-LLM_BASE_URL=https://openrouter.ai/api/v1
-LLM_MODEL_NAME=qwen/qwen3-235b-a22b-2507
-
-EMBEDDING_PROVIDER=openai
-EMBEDDING_MODEL=openai/text-embedding-3-small
-EMBEDDING_BASE_URL=https://openrouter.ai/api
-EMBEDDING_API_KEY=sk-or-v1-your-key
-EMBEDDING_DIMENSIONS=768
-```
-
-```bash
-npm run setup:all && npm run dev
-```
-
-Open `http://localhost:3000` — backend API at `http://localhost:5001`.
-
----
-
-### Option B: Docker — Local Ollama
-
-```bash
-git clone https://github.com/aaronjmars/MiroShark.git
-cd MiroShark
-docker compose up -d
-
-# Pull models into Ollama
-docker exec miroshark-ollama ollama pull qwen3.5:27b
-docker exec miroshark-ollama ollama pull nomic-embed-text
-```
-
-Open `http://localhost:3000`.
-
----
-
-### Option C: Manual — Local Ollama
+### Setup
 
 ```bash
 # 1. Start Neo4j
@@ -176,67 +122,22 @@ docker run -d --name neo4j \
   -e NEO4J_AUTH=neo4j/miroshark \
   neo4j:5.15-community
 
-# 2. Start Ollama & pull models
-ollama serve &
-ollama pull qwen3.5:27b
-ollama pull nomic-embed-text
-
-# 3. Configure & run
+# 2. Configure
 cp .env.example .env
-npm run setup:all
-npm run dev
+# Edit .env with your LLM provider settings
+
+# 3. Install & run
+bun run setup:all
+bun run dev
 ```
 
----
+Open `http://localhost:3000` — backend API at `http://localhost:5001`.
 
-### Option D: Claude Code (no API key needed)
-
-Use your Claude Pro/Max subscription as the LLM backend via the local Claude Code CLI. No API key or GPU required — just a logged-in `claude` installation.
+### Docker
 
 ```bash
-# 1. Install Claude Code (if not already)
-npm install -g @anthropic-ai/claude-code
-
-# 2. Log in (opens browser)
-claude
-
-# 3. Start Neo4j
-docker run -d --name neo4j \
-  -p 7474:7474 -p 7687:7687 \
-  -e NEO4J_AUTH=neo4j/miroshark \
-  neo4j:5.15-community
-
-# 4. Configure
-cp .env.example .env
+docker compose up --build
 ```
-
-Edit `.env`:
-
-```bash
-LLM_PROVIDER=claude-code
-# Optional: pick a specific model (default uses your Claude Code default)
-# CLAUDE_CODE_MODEL=claude-sonnet-4-20250514
-```
-
-You still need embeddings — use a cloud provider or local Ollama for those (Claude Code doesn't support embeddings). You also still need Ollama or a cloud API for the CAMEL-AI simulation rounds (see coverage table below).
-
-```bash
-npm run setup:all && npm run dev
-```
-
-> **What's covered:** When `LLM_PROVIDER=claude-code`, all MiroShark services route through Claude Code — graph building (ontology, NER), agent profile generation, simulation config, report generation, and persona chat. The only exception is the CAMEL-AI simulation engine itself, which requires an OpenAI-compatible API (Ollama or cloud) since it manages its own LLM connections internally.
-
-| Component | Claude Code | Needs separate LLM |
-|---|---|---|
-| Graph building (ontology + NER) | Yes | — |
-| Agent profile generation | Yes | — |
-| Simulation config generation | Yes | — |
-| Report generation | Yes | — |
-| Persona chat | Yes | — |
-| CAMEL-AI simulation rounds | — | Yes (Ollama or cloud) |
-| Embeddings | — | Yes (Ollama or cloud) |
-
-> **Performance note:** Each LLM call spawns a `claude -p` subprocess (~2-5s overhead). Best for small simulations or hybrid mode — use Ollama/cloud for the high-volume simulation rounds, Claude Code for everything else.
 
 ---
 
@@ -244,145 +145,56 @@ npm run setup:all && npm run dev
 
 ### Recommended Models
 
-A typical simulation runs ~40 turns × 100+ agents. Pick a model that balances cost and quality for that volume.
-
-#### Cloud (OpenRouter)
-
 | Model | ID | Cost/sim | Notes |
 |---|---|---|---|
 | **Qwen3 235B A22B** ⭐ | `qwen/qwen3-235b-a22b-2507` | ~$0.30 | Best overall |
 | GPT-5 Nano | `openai/gpt-5-nano` | ~$0.41 | Budget option |
 | Gemini 2.5 Flash Lite | `google/gemini-2.5-flash-lite` | ~$0.58 | Good alt |
-| DeepSeek V3.2 | `deepseek/deepseek-v3.2` | ~$1.11 | Stronger agentic reasoning |
-
-**Embeddings:** `openai/text-embedding-3-small` on OpenRouter. Keep `EMBEDDING_DIMENSIONS=768`.
-
-#### Local (Ollama)
-
-> **Context override required.** Ollama defaults to 4096 tokens, but MiroShark prompts need 10–30k. Create a custom Modelfile:
->
-> ```bash
-> printf 'FROM qwen3:14b\nPARAMETER num_ctx 32768' > Modelfile
-> ollama create mirosharkai -f Modelfile
-> ```
-
-| Model | VRAM | Speed | Notes |
-|---|---|---|---|
-| `qwen3.5:27b` | 20GB+ | ~40 t/s | Best quality |
-| `qwen3.5:35b-a3b` *(MoE)* | 16GB | ~112 t/s | Fastest — MoE activates only 3B params |
-| `qwen3:14b` | 12GB | ~60 t/s | Solid balance |
-| `qwen3:8b` | 8GB | ~42 t/s | Minimum viable; 40K context limit |
-
-**Hardware quick-pick:**
-
-| Setup | Model |
-|---|---|
-| RTX 3090/4090 or M2 Pro 32GB+ | `qwen3.5:27b` |
-| RTX 4080 / M2 Pro 16GB | `qwen3.5:35b-a3b` |
-| RTX 4070 / M1 Pro | `qwen3:14b` |
-| 8GB VRAM / laptop | `qwen3:8b` |
-
-**Embeddings locally:** `ollama pull nomic-embed-text` — 768 dimensions, matches Neo4j default.
-
-**Hybrid tip:** Run local for simulation rounds (high-volume), route to a cloud model only for final report generation. Most users land here naturally — see **Smart Model** below.
-
-### Smart Model
-
-Set `SMART_MODEL_NAME` to route intelligence-sensitive workflows through a stronger model while keeping everything else on your default (cheaper/faster) model. When not set, all workflows use the same model.
-
-**What uses the smart model:**
-
-| Workflow | Why |
-|---|---|
-| Report generation | Multi-turn reasoning, end-user facing output |
-| Ontology extraction | Foundational — defines the entire knowledge graph schema |
-| Graph reasoning | Sub-question generation, deep search during reports |
-
-**Everything else** (NER extraction, profile generation, simulation config) stays on the default model — these are high-volume and don't need top-tier reasoning.
-
-**Example configs:**
-
-```bash
-# Ollama for bulk work, Claude Code for reports
-LLM_MODEL_NAME=qwen3.5:27b
-SMART_PROVIDER=claude-code
-SMART_MODEL_NAME=claude-sonnet-4-20250514
-
-# Ollama for bulk work, OpenRouter premium for reports
-LLM_MODEL_NAME=qwen3.5:27b
-SMART_PROVIDER=openai
-SMART_API_KEY=sk-or-v1-your-key
-SMART_BASE_URL=https://openrouter.ai/api/v1
-SMART_MODEL_NAME=anthropic/claude-sonnet-4
-
-# Same provider, just a bigger model for reports
-LLM_MODEL_NAME=qwen3:8b
-SMART_MODEL_NAME=qwen3.5:27b
-```
-
-If only `SMART_MODEL_NAME` is set (without `SMART_PROVIDER`/`SMART_BASE_URL`/`SMART_API_KEY`), the smart model inherits the default provider settings — useful when you just want a bigger model on the same backend.
 
 ### Environment Variables
 
-All settings live in `.env` (copy from `.env.example`):
+All settings live in `.env` (copy from `.env.example`). Key variables:
 
 ```bash
-# LLM (default — used for bulk/high-volume workflows)
-LLM_PROVIDER=openai                # "openai" (default) or "claude-code"
-LLM_API_KEY=ollama                  # Not needed for claude-code mode
+LLM_PROVIDER=openai          # "openai" or "claude-code"
+LLM_API_KEY=ollama
 LLM_BASE_URL=http://localhost:11434/v1
 LLM_MODEL_NAME=qwen3.5:27b
-
-# Smart model (optional — used for reports, ontology, graph reasoning)
-# SMART_PROVIDER=claude-code       # "openai", "claude-code", or empty (inherit)
-# SMART_MODEL_NAME=claude-sonnet-4-20250514
-# SMART_API_KEY=                    # Only if different from LLM_API_KEY
-# SMART_BASE_URL=                   # Only if different from LLM_BASE_URL
-
-# Claude Code mode (only when LLM_PROVIDER=claude-code)
-# CLAUDE_CODE_MODEL=claude-sonnet-4-20250514
-
-# Neo4j
 NEO4J_URI=bolt://localhost:7687
-NEO4J_USER=neo4j
-NEO4J_PASSWORD=miroshark
-
-# Embeddings
-EMBEDDING_PROVIDER=ollama          # "ollama" or "openai"
+EMBEDDING_PROVIDER=ollama
 EMBEDDING_MODEL=nomic-embed-text
-EMBEDDING_BASE_URL=http://localhost:11434
-EMBEDDING_DIMENSIONS=768
-
-# Web Enrichment (auto-researches public figures during persona generation)
-WEB_ENRICHMENT_ENABLED=true
-# WEB_SEARCH_MODEL=perplexity/sonar-pro  # Optional: grounded web search via OpenRouter
 ```
-
 
 ---
 
-## Hardware Requirements
+## Tech Stack
 
-**Local (Ollama):**
+| Layer | Tech |
+|---|---|
+| Backend Runtime | Python 3.13+ (target: 3.15 Free-threaded) |
+| Package Manager | UV (Astral) + Bun (Oven) |
+| Web Framework | Flask 3.x |
+| Data Processing | Polars (Rust-core), orjson |
+| Validation | Pydantic v2 (Rust-core) |
+| Graph DB | Neo4j 5.x (async driver) |
+| Cache | Redis (semantic caching) |
+| LLM | Qwen 3.5 35B via vLLM/Ollama |
+| Simulation | CAMEL-AI + Wonderwall (fork OASIS) |
+| Frontend | Vue 3.5 + Vite 7.2 + D3.js + Bun |
 
-| | Minimum | Recommended |
-|---|---|---|
-| RAM | 16 GB | 32 GB |
-| VRAM | 10 GB | 24 GB |
-| Disk | 20 GB | 50 GB |
-
-**Cloud mode:** No GPU needed — just Neo4j and an API key. Any 4 GB RAM machine works.
+---
 
 ## Use Cases
 
-- **PR crisis testing** — simulate public reaction to a press release before publishing
-- **Trading signals** — feed financial news and observe simulated market sentiment
-- **Policy analysis** — test draft regulations against a simulated public
-- **Creative experiments** — feed a novel with a lost ending; agents write a narratively consistent conclusion
+- **Trading signal simulation** — Feed financial news, observe simulated market sentiment and prediction market movements
+- **PR crisis testing** — Simulate public reaction to announcements before publishing
+- **Policy analysis** — Test regulations against a simulated public with investment behavior
+- **Sentiment velocity research** — Track the speed of opinion shifts as a predictive signal
 
-Support the project : 0xd7bc6a05a56655fb2052f742b012d1dfd66e1ba3
-AGPL-3.0. See [LICENSE](./LICENSE).
+---
 
 ## Credits
 
-Built on [MiroFish](https://github.com/666ghj/MiroFish) by [666ghj](https://github.com/666ghj) (Shanda Group). Neo4j + Ollama storage layer adapted from [MiroFish-Offline](https://github.com/nikmcfly/MiroFish-Offline) by [nikmcfly](https://github.com/nikmcfly). Simulation engine powered by [OASIS](https://github.com/camel-ai/oasis) (CAMEL-AI).
+Built on [MiroShark](https://github.com/aaronjmars/MiroShark) by [aaronjmars](https://github.com/aaronjmars). Neo4j + Ollama storage layer adapted from [MiroFish-Offline](https://github.com/nikmcfly/MiroFish-Offline). Simulation engine powered by [OASIS](https://github.com/camel-ai/oasis) (CAMEL-AI).
+
+AGPL-3.0. See [LICENSE](./LICENSE).

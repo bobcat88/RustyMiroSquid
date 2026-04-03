@@ -5,14 +5,14 @@ Replaces all Zep Cloud API calls with local Neo4j Cypher queries.
 Includes: CRUD, NER/RE-based text ingestion, hybrid search, retry logic.
 """
 
-import json
+import orjson
 import time
 import uuid
 import logging
 from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional, Callable
 
-from neo4j import GraphDatabase, Session as Neo4jSession
+from neo4j import GraphDatabase
 from neo4j.exceptions import (
     TransientError,
     ServiceUnavailable,
@@ -152,7 +152,7 @@ class Neo4jStorage(GraphStorage):
                 SET g.ontology_json = $ontology_json
                 """,
                 gid=graph_id,
-                ontology_json=json.dumps(ontology, ensure_ascii=False),
+                ontology_json=ororjson.dumps(ontology).decode(),
             )
 
         with self._driver.session() as session:
@@ -166,7 +166,7 @@ class Neo4jStorage(GraphStorage):
             )
             record = result.single()
             if record and record["oj"]:
-                return json.loads(record["oj"])
+                return orjson.loads(record["oj"])
             return {}
 
     # ----------------------------------------------------------------
@@ -215,7 +215,7 @@ class Neo4jStorage(GraphStorage):
 
         entity_embeddings = all_embeddings[:len(entities)]
         relation_embeddings = all_embeddings[len(entities):]
-        logger.info(f"[add_text] Embedding done, writing to Neo4j...")
+        logger.info("[add_text] Embedding done, writing to Neo4j...")
 
         with self._driver.session() as session:
             # Create episode node
@@ -257,7 +257,7 @@ class Neo4jStorage(GraphStorage):
                     "name": ename,
                     "name_lower": ename.lower(),
                     "summary": summary_text,
-                    "attrs_json": json.dumps(attrs, ensure_ascii=False),
+                    "attrs_json": ororjson.dumps(attrs).decode(),
                     "embedding": embedding,
                 })
 
@@ -625,8 +625,8 @@ class Neo4jStorage(GraphStorage):
         props = dict(node)
         attrs_json = props.pop("attributes_json", "{}")
         try:
-            attributes = json.loads(attrs_json) if attrs_json else {}
-        except (json.JSONDecodeError, TypeError):
+            attributes = orjson.loads(attrs_json) if attrs_json else {}
+        except (orjson.JSONDecodeError, TypeError):
             attributes = {}
 
         # Remove internal fields from dict
@@ -648,8 +648,8 @@ class Neo4jStorage(GraphStorage):
         props = dict(rel)
         attrs_json = props.pop("attributes_json", "{}")
         try:
-            attributes = json.loads(attrs_json) if attrs_json else {}
-        except (json.JSONDecodeError, TypeError):
+            attributes = orjson.loads(attrs_json) if attrs_json else {}
+        except (orjson.JSONDecodeError, TypeError):
             attributes = {}
 
         # Remove internal fields

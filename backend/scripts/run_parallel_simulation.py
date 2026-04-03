@@ -70,13 +70,14 @@ if sys.platform == 'win32':
 
 import argparse
 import asyncio
-import json
+import concurrent.futures
+import orjson
 import logging
 import multiprocessing
 import random
 import signal
 import sqlite3
-import warnings
+import sys
 from datetime import datetime
 from typing import Dict, Any, List, Optional, Tuple
 
@@ -287,8 +288,8 @@ class ParallelIPCHandler:
         for filepath, _ in command_files:
             try:
                 with open(filepath, 'r', encoding='utf-8') as f:
-                    return json.load(f)
-            except (json.JSONDecodeError, OSError):
+                    return orjson.loads(f.read())
+            except (orjson.JSONDecodeError, OSError):
                 continue
 
         return None
@@ -305,7 +306,7 @@ class ParallelIPCHandler:
         
         response_file = os.path.join(self.responses_dir, f"{command_id}.json")
         with open(response_file, 'w', encoding='utf-8') as f:
-            json.dump(response, f, ensure_ascii=False, indent=2)
+            f.write(orjson.dumps(response, option=orjson.OPT_INDENT_2).decode())
         
         # Delete command file
         command_file = os.path.join(self.commands_dir, f"{command_id}.json")
@@ -561,10 +562,10 @@ class ParallelIPCHandler:
             if row:
                 user_id, info_json, created_at = row
                 try:
-                    info = json.loads(info_json) if info_json else {}
+                    info = orjson.loads(info_json) if info_json else {}
                     result["response"] = info.get("response", info)
                     result["timestamp"] = created_at
-                except json.JSONDecodeError:
+                except orjson.JSONDecodeError:
                     result["response"] = info_json
 
             conn.close()
@@ -621,7 +622,7 @@ class ParallelIPCHandler:
 def load_config(config_path: str) -> Dict[str, Any]:
     """Load configuration file"""
     with open(config_path, 'r', encoding='utf-8') as f:
-        return json.load(f)
+        return orjson.loads(f.read())
 
 
 # Non-core action types to filter out (these actions have low analytical value)
@@ -718,8 +719,8 @@ def fetch_new_actions_from_db(
             
             # Parse action arguments
             try:
-                action_args = json.loads(info_json) if info_json else {}
-            except json.JSONDecodeError:
+                action_args = orjson.loads(info_json) if info_json else {}
+            except orjson.JSONDecodeError:
                 action_args = {}
             
             # Simplify action_args, keeping only key fields (preserve full content, no truncation)
@@ -1666,7 +1667,7 @@ POLYMARKET_ACTION_TYPE_MAP = {
 def _load_polymarket_profiles(profile_path: str) -> List[Dict[str, Any]]:
     """Load Polymarket agent profiles from JSON."""
     with open(profile_path, 'r', encoding='utf-8') as f:
-        return json.load(f)
+        return orjson.loads(f.read())
 
 
 def _build_polymarket_agent_graph(
@@ -1743,8 +1744,8 @@ def _fetch_polymarket_actions_from_db(
                 continue
 
             try:
-                action_args = json.loads(info_json) if info_json else {}
-            except json.JSONDecodeError:
+                action_args = orjson.loads(info_json) if info_json else {}
+            except orjson.JSONDecodeError:
                 action_args = {}
 
             action_type = POLYMARKET_ACTION_TYPE_MAP.get(action, action.upper())
@@ -2194,6 +2195,19 @@ async def run_synchronized_simulation(
     start_time = datetime.now()
     log_info(f"Starting synchronized simulation: {total_rounds} rounds")
 
+    # ── No-GIL detection + ThreadPoolExecutor for CPU-bound work ──
+    # Avec Python 3.13+ free-threaded, le ThreadPoolExecutor exploite
+    # réellement tous les cœurs pour le travail CPU-bound (beliefs, memory).
+    from app.config import Config
+    _is_nogil = hasattr(sys, '_is_gil_enabled') and not sys._is_gil_enabled()
+    # Respecter la limite de ressources (75-80% CPU) définie dans la config
+    max_workers = min(3, Config.MAX_WORKERS) # 1 thread par plateforme max
+    _executor = concurrent.futures.ThreadPoolExecutor(
+        max_workers=max_workers,
+        thread_name_prefix="squid_round",
+    )
+    log_info(f"No-GIL: {_is_nogil} | ThreadPool workers: {max_workers} (Cap: {Config.MAX_WORKERS})")
+
     for round_num in range(start_round, total_rounds):
         if _shutdown_event and _shutdown_event.is_set():
             log_info(f"Shutdown signal at round {round_num + 1}")
@@ -2305,7 +2319,10 @@ async def run_synchronized_simulation(
                     platform_results[name] = result
 
         # ── Post-round: fetch actions, update beliefs, record to memory ──
-        if "twitter" in platform_results:
+        # CPU-bound work — parallélisé via ThreadPoolExecutor (No-GIL)
+        def _post_round_twitter():
+            """Traitement post-round Twitter (CPU-bound, thread-safe)."""
+            nonlocal twitter_last_rowid
             actual_actions, twitter_last_rowid = fetch_new_actions_from_db(twitter_db, twitter_last_rowid, agent_names)
             if twitter_belief:
                 twitter_belief.after_round(twitter_db, twitter_result.env, platform_results["twitter"], round_num, actual_actions)
@@ -2320,7 +2337,9 @@ async def run_synchronized_simulation(
                 twitter_logger.log_round_end(round_num + 1, len(actual_actions))
             twitter_result.total_actions += len(actual_actions)
 
-        if "reddit" in platform_results:
+        def _post_round_reddit():
+            """Traitement post-round Reddit (CPU-bound, thread-safe)."""
+            nonlocal reddit_last_rowid
             actual_actions, reddit_last_rowid = fetch_new_actions_from_db(reddit_db, reddit_last_rowid, agent_names)
             if reddit_belief:
                 reddit_belief.after_round(reddit_db, reddit_result.env, platform_results["reddit"], round_num, actual_actions)
@@ -2335,7 +2354,9 @@ async def run_synchronized_simulation(
                 reddit_logger.log_round_end(round_num + 1, len(actual_actions))
             reddit_result.total_actions += len(actual_actions)
 
-        if "polymarket" in platform_results:
+        def _post_round_polymarket():
+            """Traitement post-round Polymarket (CPU-bound, thread-safe)."""
+            nonlocal polymarket_last_rowid
             bridge.update_prices(polymarket_db, round_num)
             actual_actions, polymarket_last_rowid = _fetch_polymarket_actions_from_db(polymarket_db, polymarket_last_rowid, agent_names)
             if polymarket_belief:
@@ -2349,6 +2370,22 @@ async def run_synchronized_simulation(
                     polymarket_logger.log_action(round_num=round_num+1, agent_id=a['agent_id'], agent_name=a['agent_name'], action_type=a['action_type'], action_args=a['action_args'])
                 polymarket_logger.log_round_end(round_num + 1, len(actual_actions))
             polymarket_result.total_actions += len(actual_actions)
+
+        # Soumettre les traitements post-round en parallèle
+        post_futures = []
+        if "twitter" in platform_results:
+            post_futures.append(_executor.submit(_post_round_twitter))
+        if "reddit" in platform_results:
+            post_futures.append(_executor.submit(_post_round_reddit))
+        if "polymarket" in platform_results:
+            post_futures.append(_executor.submit(_post_round_polymarket))
+
+        # Attendre la fin de tous les traitements post-round
+        for future in concurrent.futures.as_completed(post_futures):
+            try:
+                future.result()
+            except Exception as e:
+                log_info(f"Post-round processing error: {e}")
 
         # ── Compact previous round's memory (N-2 becomes a summary) ──
         await round_memory.compact_previous_round(round_num)
@@ -2478,7 +2515,7 @@ async def main():
     minutes_per_round = time_config.get('minutes_per_round', 30)
     config_total_rounds = (total_hours * 60) // minutes_per_round
     
-    log_manager.info(f"Simulation parameters:")
+    log_manager.info("Simulation parameters:")
     log_manager.info(f"  - Total simulation duration: {total_hours} hours")
     log_manager.info(f"  - Time per round: {minutes_per_round} minutes")
     log_manager.info(f"  - Configured total rounds: {config_total_rounds}")
@@ -2489,10 +2526,10 @@ async def main():
     log_manager.info(f"  - Number of Agents: {len(config.get('agent_configs', []))}")
 
     log_manager.info("Log structure:")
-    log_manager.info(f"  - Main log: simulation.log")
-    log_manager.info(f"  - Twitter actions: twitter/actions.jsonl")
-    log_manager.info(f"  - Reddit actions: reddit/actions.jsonl")
-    log_manager.info(f"  - Polymarket actions: polymarket/actions.jsonl")
+    log_manager.info("  - Main log: simulation.log")
+    log_manager.info("  - Twitter actions: twitter/actions.jsonl")
+    log_manager.info("  - Reddit actions: reddit/actions.jsonl")
+    log_manager.info("  - Polymarket actions: polymarket/actions.jsonl")
     log_manager.info("=" * 60)
 
     start_time = datetime.now()
@@ -2640,8 +2677,8 @@ async def main():
         log_manager.info("[Reddit] Environment closed")
     
     log_manager.info("=" * 60)
-    log_manager.info(f"All done!")
-    log_manager.info(f"Log files:")
+    log_manager.info("All done!")
+    log_manager.info("Log files:")
     log_manager.info(f"  - {os.path.join(simulation_dir, 'simulation.log')}")
     log_manager.info(f"  - {os.path.join(simulation_dir, 'twitter', 'actions.jsonl')}")
     log_manager.info(f"  - {os.path.join(simulation_dir, 'reddit', 'actions.jsonl')}")
