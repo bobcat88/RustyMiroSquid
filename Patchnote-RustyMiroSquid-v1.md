@@ -109,3 +109,9 @@
 
 ### QoL
 - Codebase allégée et débarrassée des scripts obsolètes.
+
+## v1.7.2 — 2026-04-04
+
+### QoL
+- Synchronisation de la documentation (`README.md`, `GEMINI.md`) : remplacement des références résiduelles à Flask par FastAPI.
+- Alignement technique des fichiers de root avec l'état réel du backend (Port 5001, Uvicorn).
