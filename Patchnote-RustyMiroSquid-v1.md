@@ -100,3 +100,12 @@
 ### FUNCTION
 - Nettoyage final du projet MiroShark vers RustyMiroSquid.
 - Roadmap mise à jour (Backlog v2) incluant l'observabilité et les futures optimisations LLM (TurboQuant).
+
+## v1.7.1 — 2026-04-04
+
+### TECH
+- Nettoyage des artefacts de migration (`migrate_orjson.py`, `test_orjson_compat.py`).
+- Suppression des fichiers de logs et de couverture temporaires (`pytest_*.txt`, `.coverage`).
+
+### QoL
+- Codebase allégée et débarrassée des scripts obsolètes.
