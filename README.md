@@ -173,7 +173,7 @@ EMBEDDING_MODEL=nomic-embed-text
 |---|---|
 | Backend Runtime | Python 3.13+ (target: 3.15 Free-threaded) |
 | Package Manager | UV (Astral) + Bun (Oven) |
-| Web Framework | Flask 3.x |
+| Web Framework | FastAPI 0.115+ |
 | Data Processing | Polars (Rust-core), orjson |
 | Validation | Pydantic v2 (Rust-core) |
 | Graph DB | Neo4j 5.x (async driver) |

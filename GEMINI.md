@@ -6,9 +6,9 @@ Mutation de MiroShark (swarm intelligence engine) en **RustyMiroSquid** — mote
 ## Architecture
 ```
 RustyMiroSquid/
-├── backend/              # Python 3.15 (No-GIL) — Flask API + simulation engine
+├── backend/              # Python 3.15 (No-GIL) — FastAPI API + simulation engine
 │   ├── app/              # API routes, services, models, config
-│   │   ├── api/          # Flask REST endpoints
+│   │   ├── api/          # FastAPI REST endpoints
 │   │   ├── models/       # Pydantic v2 schemas (agent personas, etc.)
 │   │   ├── services/     # Core logic: simulation runner, report agent, polars analytics
 │   │   └── storage/      # Neo4j storage layer
@@ -30,7 +30,7 @@ RustyMiroSquid/
 | Runtime Backend | Python 3.15 Free-threaded (No-GIL) |
 | Package Manager Backend | UV (Astral) |
 | Runtime Frontend | Bun (Oven) |
-| Web Framework | Flask 3.x |
+| Web Framework | FastAPI 0.115+ |
 | Data Processing | Polars (Rust-core), orjson |
 | Validation | Pydantic v2 (Rust-core) |
 | Graph DB | Neo4j 5.x (async driver) |
@@ -45,7 +45,7 @@ RustyMiroSquid/
 bun run setup:all           # Backend (uv sync) + Frontend (bun install)
 
 # Dev
-bun run dev                 # Backend Flask + Frontend Vite (parallel)
+bun run dev                 # Backend FastAPI + Frontend Vite (parallel)
 cd backend && uv run python run.py   # Backend seul
 
 # Tests
