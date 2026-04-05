@@ -16,71 +16,99 @@ class TriggerService:
     """
     
     def __init__(self):
-        self.assets = ["SPY", "QQQ", "NVDA", "TSLA", "BTC-USD"]
-        self.rss_feeds = [
+        self.assets: List[str] = ["SPY", "QQQ", "TQQQ", "NVDA", "AAPL", "MSFT", "TSLA", "BTC-USD"]
+        self.rss_feeds: List[str] = [
             "https://www.reutersagency.com/feed/?best-topics=business-finance&post_type=best",
             "https://feeds.bloomberg.com/markets/news.rss"
         ]
-        self.market_color = "MODERATE"  # Default: Plan M
-        self.fear_greed_idx = 50.0  # 0-100
-        self.signals = []
+        self.market_color: str = "MODERATE"  # Default: Plan M
+        self.fear_greed_idx: float = 50.0  # 0-100
+        self.signals: List[Dict[str, Any]] = []
         
+        # State persistence
+        self.latest_prices: Dict[str, Any] = {}
+        self.headlines: List[Dict[str, str]] = []
+
         # LLM for news sentiment analysis
         self.llm = create_llm_client()
 
     async def poll_market_data(self) -> Dict[str, Any]:
-        """Fetch latest OHLC data via yfinance."""
+        """Fetch latest OHLC data via yfinance for HTF trend and LTF entries."""
         results = {}
         for symbol in self.assets:
             try:
                 ticker = yf.Ticker(symbol)
-                # Get last 5 days of 1h data
-                df = ticker.history(period="5d", interval="1h")
-                if not df.empty:
-                    latest = df.iloc[-1]
-                    prev = df.iloc[-2] if len(df) > 1 else latest
-                    
-                    price = latest['Close']
-                    change = (price - prev['Close']) / prev['Close'] if prev['Close'] != 0 else 0
-                    
-                    results[symbol] = {
-                        "price": float(price),
-                        "change_pct": float(change * 100),
-                        "high": float(latest['High']),
-                        "low": float(latest['Low']),
-                        "volume": int(latest['Volume']),
-                        "timestamp": datetime.now().isoformat()
-                    }
-                    
-                    # Basic FVG (Fair Value Gap) detection logic
-                    # A gap between candle 1 high and candle 3 low (in an uptrend)
-                    if len(df) >= 3:
-                        c1 = df.iloc[-3]
-                        c2 = df.iloc[-2]
-                        c3 = df.iloc[-1]
-                        
-                        # Bullish FVG
-                        if c3['Low'] > c1['High']:
-                            self.signals.append({
-                                "type": "BULLISH_FVG",
-                                "symbol": symbol,
-                                "top": float(c3['Low']),
-                                "bottom": float(c1['High']),
-                                "timestamp": datetime.now().isoformat()
-                            })
-                        # Bearish FVG
-                        elif c3['High'] < c1['Low']:
-                            self.signals.append({
-                                "type": "BEARISH_FVG",
-                                "symbol": symbol,
-                                "top": float(c1['Low']),
-                                "bottom": float(c3['High']),
-                                "timestamp": datetime.now().isoformat()
-                            })
+                
+                # HTF: 1h for Trend Bias (last 10 days)
+                df_htf = ticker.history(period="10d", interval="1h")
+                # LTF: 15m for Execution (last 2 days)
+                df_ltf = ticker.history(period="2d", interval="15m")
+                
+                if df_htf.empty or df_ltf.empty:
+                    continue
+
+                # --- HTF Trend Bias (EMA 50 check) ---
+                close_htf = df_htf['Close']
+                ema50_htf = close_htf.ewm(span=50, adjust=False).mean()
+                latest_close_htf = close_htf.iloc[-1]
+                latest_ema50_htf = ema50_htf.iloc[-1]
+                
+                bias = "BULLISH" if latest_close_htf > latest_ema50_htf else "BEARISH"
+                self.signals.append({
+                    "type": f"HTF_BIAS_{bias}", "symbol": symbol,
+                    "htf_price": float(latest_close_htf), "htf_ema50": float(latest_ema50_htf),
+                    "timestamp": datetime.now().isoformat()
+                })
+
+                # Latest Price for results
+                current_price = float(df_ltf['Close'].iloc[-1])
+                results[symbol] = {
+                    "price": current_price,
+                    "change_pct": float((current_price - df_htf['Close'].iloc[-1]) / df_htf['Close'].iloc[-1] * 100),
+                    "bias": bias,
+                    "timestamp": datetime.now().isoformat()
+                }
+
+                # --- SMC (Smart Money Concepts) Detection on LTF (15m) ---
+                # 1. FVG Detection (LTF)
+                if len(df_ltf) >= 3:
+                    c1, c2, c3 = df_ltf.iloc[-3], df_ltf.iloc[-2], df_ltf.iloc[-1]
+                    if c3['Low'] > c1['High']: # Bullish FVG
+                        self.signals.append({
+                            "type": "LTF_FVG_BULLISH", "symbol": symbol,
+                            "top": float(c3['Low']), "bottom": float(c1['High']),
+                            "timestamp": datetime.now().isoformat()
+                        })
+                    elif c3['High'] < c1['Low']: # Bearish FVG
+                        self.signals.append({
+                            "type": "LTF_FVG_BEARISH", "symbol": symbol,
+                            "top": float(c1['Low']), "bottom": float(c3['High']),
+                            "timestamp": datetime.now().isoformat()
+                        })
+
+                # 2. LTF Liquidity Sweep
+                high_24h = df_ltf.iloc[:-1]['High'].max()
+                low_24h = df_ltf.iloc[:-1]['Low'].min()
+                l_high, l_low, l_close = df_ltf.iloc[-1]['High'], df_ltf.iloc[-1]['Low'], df_ltf.iloc[-1]['Close']
+
+                if l_high > high_24h and l_close < high_24h:
+                    self.signals.append({"type": "LTF_SWEEP_TOP", "symbol": symbol, "level": float(high_24h)})
+                elif l_low < low_24h and l_close > low_24h:
+                    self.signals.append({"type": "LTF_SWEEP_BOTTOM", "symbol": symbol, "level": float(low_24h)})
+                
+                # 3. Market Structure Shift (MSS) on LTF
+                # Simple version: cross of recent fractal high/low
+                prev_high = df_ltf.iloc[-5:-1]['High'].max()
+                prev_low = df_ltf.iloc[-5:-1]['Low'].min()
+                if l_close > prev_high and bias == "BULLISH":
+                    self.signals.append({"type": "LTF_MSS_BULLISH", "symbol": symbol, "timestamp": datetime.now().isoformat()})
+                elif l_close < prev_low and bias == "BEARISH":
+                    self.signals.append({"type": "LTF_MSS_BEARISH", "symbol": symbol, "timestamp": datetime.now().isoformat()})
                             
             except Exception as e:
                 logger.error(f"Error polling yfinance for {symbol}: {e}")
         
+        self.latest_prices = results
         return results
 
     async def poll_news(self) -> List[Dict[str, str]]:
@@ -98,6 +126,7 @@ class TriggerService:
             except Exception as e:
                 logger.error(f"Error polling RSS {url}: {e}")
         
+        self.headlines = headlines
         if headlines:
             # Aggregate sentiment using LLM
             await self._analyze_sentiment(headlines)
@@ -129,12 +158,35 @@ class TriggerService:
         except Exception as e:
             logger.error(f"Sentiment analysis failed: {e}")
 
+    async def update(self) -> Dict[str, Any]:
+        """Poll all data sources and return the latest state."""
+        logger.info("Updating market triggers...")
+        await self.poll_market_data()
+        await self.poll_news()
+        return self.get_current_state()
+
     def get_current_state(self) -> Dict[str, Any]:
         """Return the current trigger state for agent consumption."""
+        # Group signals by symbol for the bridge
+        smc_by_symbol: Dict[str, List[str]] = {}
+        
+        # Explicit type check for the linter
+        all_signals: List[Dict[str, Any]] = self.signals
+        
+        for s in all_signals[-20:]:  # Slice from the end
+            symbol = str(s.get("symbol", "GLOBAL"))
+            sig_type = str(s.get("type", "UNKNOWN"))
+            
+            if symbol not in smc_by_symbol:
+                smc_by_symbol[symbol] = []
+            smc_by_symbol[symbol].append(sig_type)
+
         return {
             "market_color": self.market_color,
-            "fear_greed_index": self.fear_greed_idx,
-            "recent_signals": self.signals[-10:],
+            "sentiment_score": (self.fear_greed_idx - 50.0) / 10.0,
+            "headlines": [str(h.get('title', '')) for h in self.headlines],
+            "smc_signals": smc_by_symbol,
+            "prices": {str(s): data.get('price', 0.0) for s, data in self.latest_prices.items()},
             "last_update": datetime.now().isoformat()
         }
 

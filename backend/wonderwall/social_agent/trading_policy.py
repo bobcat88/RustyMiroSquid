@@ -10,9 +10,16 @@ class TradingPolicy:
     Used by agents to validate and execute trade ideas.
     """
     
-    def __init__(self, risk_per_trade: float = 0.01):
+    def __init__(self, risk_per_trade: float = 0.01, domicile: str = "France"):
         self.risk_per_trade = risk_per_trade  # 1% risk of account
-        self.min_rr = 3.0  # 1:3 Risk/Reward
+        self.domicile = domicile
+        self.min_rr = 3.0  # Default 1:3 Risk/Reward
+        
+        # Adjust minimum R:R for tax drag (France: 31.4%)
+        # To get a NET 2.0 R:R, we need ~2.9 gross.
+        # To get a NET 3.0 R:R, we need ~4.3 gross.
+        if self.domicile == "France":
+            self.min_rr = 4.0 # Conservative institutional floor for French residents
 
     def should_trade(self, market_color: str, signal: Optional[Dict[str, Any]] = None) -> Tuple[bool, str]:
         """
@@ -48,12 +55,44 @@ class TradingPolicy:
             return False
         return (reward / risk) >= self.min_rr
 
-    def get_plan_name(self, market_color: str) -> str:
-        """Map Market Color to OVTLYR Plan Name."""
-        mapping = {
-            "AGGRESSIVE": "Plan A (Alpha)",
-            "MODERATE": "Plan M (Momentum)",
-            "DEFENSIVE": "Plan ETF (Tactical)",
-            "CASH": "SICADFU (Sit In Cash)"
-        }
-        return mapping.get(market_color, "Unknown Plan")
+    def should_move_to_be(self, entry: float, current_price: float, stop_loss: float) -> bool:
+        """Move SL to break even after 1:1 displacement."""
+        risk = abs(entry - stop_loss)
+        displacement = abs(current_price - entry)
+        # Check if we've moved in the right direction
+        if (entry > stop_loss and current_price > entry) or (entry < stop_loss and current_price < entry):
+            return displacement >= risk
+        return False
+
+    def should_scale_out(self, entry: float, current_price: float, stop_loss: float) -> bool:
+        """Take 50% partial at 2.0 R:R (Double the initial risk)."""
+        risk = abs(entry - stop_loss)
+        if risk == 0:
+            return False
+        displacement = abs(current_price - entry)
+        return displacement >= (2.0 * risk)
+
+    def check_smc_confluences(self, signals: List[str], bias: str) -> bool:
+        """
+        Claude-style 3-step check for institutional setups:
+        1. HTF Trend/Bias (OVTLYR or EMA).
+        2. LTF Liquidity Sweep.
+        3. LTF Structure Shift (MSS).
+        """
+        # 1. Bias Check (HTF)
+        # 2. Sweep Check (LTF)
+        # 3. MSS Check (LTF)
+        
+        # Bullish setup: Bottom sweep + Bullish MSS + Bullish Bias
+        if bias.upper() == "BULLISH":
+            has_sweep = any("SWEEP_BOTTOM" in s for s in signals)
+            has_mss = any("MSS_BULLISH" in s for s in signals)
+            return has_sweep and has_mss
+            
+        # Bearish setup: Top sweep + Bearish MSS + Bearish Bias
+        elif bias.upper() == "BEARISH":
+            has_sweep = any("SWEEP_TOP" in s for s in signals)
+            has_mss = any("MSS_BEARISH" in s for s in signals)
+            return has_sweep and has_mss
+            
+        return False

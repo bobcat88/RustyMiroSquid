@@ -25,11 +25,23 @@ requests>=2.31.0
 # No separate install needed — camel-oasis is no longer a pip dependency
 camel-ai==0.2.78
 
+# Wonderwall runtime dependencies (needed by recsys, agent_graph, agents_generator)
+numpy>=1.26.0
+pandas>=2.0.0
+scikit-learn>=1.3.0
+torch>=2.0.0
+sentence-transformers>=2.2.0
+igraph>=0.11.0
+
 # ============= File Processing =============
 PyMuPDF>=1.24.0
 # Encoding detection (supports non-UTF-8 encoded text files)
 charset-normalizer>=3.0.0
 chardet>=5.0.0
+
+# ============= Trading API Integration =============
+alpaca-py>=0.30.0
+ib_insync>=0.9.86
 
 # ============= Utility Libraries =============
 # Environment variable loading
@@ -40,3 +52,7 @@ pydantic>=2.0.0
 # Data Retrieval & Triggers
 yfinance>=0.2.36
 feedparser>=6.0.10
+
+# ============= Development / Testing =============
+pytest>=8.0.0
+pytest-asyncio>=0.23.0

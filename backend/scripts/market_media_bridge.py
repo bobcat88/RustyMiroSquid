@@ -144,36 +144,42 @@ class TriggerSnapshot:
     price_data: Dict[str, float] = field(default_factory=dict)
 
     def to_agent_prompt(self) -> str:
-        """Format trigger data for injection into agent prompts."""
-        lines = ["# GLOBAL MARKET COLOR & TRIGGERS"]
-        lines.append(f"Current Market Mood: **{self.market_color}** (Sentiment: {self.sentiment_score:+.2f})")
-        lines.append("This data reflects real-world market conditions (yfinance + News RSS).")
-        lines.append("")
-
-        if self.rss_headlines:
-            lines.append("## RECENT HEADLINES")
-            count = 0
-            for h in self.rss_headlines:
-                if count >= 5:
-                    break
-                lines.append(f" - {h}")
-                count += 1
-            lines.append("")
+        """Format trigger data for injection into agent prompts with MTF clarity."""
+        lines = ["# INSTITUTIONAL MARKET CONTEXT & TRIGGERS"]
+        lines.append(f"Global Sentiment Index: **{self.sentiment_score:+.2f}**")
+        lines.append(f"OVTLYR Market Color: **{self.market_color}**")
+        lines.append("---")
 
         if self.smc_signals:
-            lines.append("## SMART MONEY CONCEPTS (SMC) SIGNALS")
+            lines.append("## SMC MULTI-TIMEFRAME (MTF) SIGNALS")
             for symbol, signals in self.smc_signals.items():
                 if signals:
-                    lines.append(f" - **{symbol}**: {', '.join(signals)}")
+                    htf = [s for s in signals if "HTF_BIAS" in s]
+                    ltf = [s for s in signals if "LTF_" in s]
+                    
+                    sig_str = ""
+                    if htf: sig_str += f"[TREND: {', '.join(htf)}] "
+                    if ltf: sig_str += f"[ENTRIES: {', '.join(ltf)}]"
+                    
+                    lines.append(f" - **{symbol}**: {sig_str}")
+            lines.append("")
+
+        if self.rss_headlines:
+            lines.append("## MACRO NEWS HEADLINES")
+            for h in self.rss_headlines[:5]:
+                lines.append(f" - {h}")
             lines.append("")
 
         if self.price_data:
-            lines.append("## REAL-WORLD PRICES")
+            lines.append("## CURRENT MARKET PRICES")
             for symbol, price in self.price_data.items():
                 lines.append(f" - {symbol}: ${price:.2f}")
 
-        lines.append("")
-        lines.append("Consider these signals for your strategy.")
+        lines.append("\n**STRATEGY NOTE**: For a high-probability institutional setup, ensure confluences:")
+        lines.append("1. **Trend Bias** (HTF_BIAS matches trade direction)")
+        lines.append("2. **Liquidity Sweep** (LTF_SWEEP at opposing level)")
+        lines.append("3. **Structure Shift** (LTF_MSS in trade direction)")
+        
         return "\n".join(lines)
 
 
@@ -419,3 +425,21 @@ def inject_trigger_context(agent, trigger_text: str):
         else:
             content = content[:marker_pos]
     agent.system_message.content = content + "\n\n" + trigger_text
+
+
+_PORTFOLIO_MARKER = "\n\n# PERSONAL PORTFOLIO STATUS"
+
+
+def inject_portfolio_context(agent, portfolio_text: str):
+    """Inject personal portfolio state into a TradingAgent's system message."""
+    if not portfolio_text:
+        return
+    content = agent.system_message.content
+    marker_pos = content.find(_PORTFOLIO_MARKER)
+    if marker_pos != -1:
+        next_marker = content.find("\n\n# ", marker_pos + len(_PORTFOLIO_MARKER))
+        if next_marker != -1:
+            content = content[:marker_pos] + content[next_marker:]
+        else:
+            content = content[:marker_pos]
+    agent.system_message.content = content + "\n\n" + portfolio_text

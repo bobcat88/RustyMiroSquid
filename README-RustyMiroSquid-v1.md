@@ -44,4 +44,5 @@ Ce projet utilise le standard **PROUST v3.0**. Pour reprendre le contexte :
 3. Lien vers [AGENTS.md](file:///C:/Users/Johan/AppData/Roaming/Antigravity/User/agents/AGENT_TEAM_BLUEPRINT.md).
 
 ## Patch Notes
+- **v1.6.0** (2026-04-05) : Intégration fiscale française (PFU 31.4%) et audit initial.
 Voir [Patchnote-RustyMiroSquid-v1.md](file:///c:/WeAreTheBorgsWorkers/RustyMiroSquid/RustyMiroSquid/Patchnote-RustyMiroSquid-v1.md).

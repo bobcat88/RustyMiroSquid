@@ -2,6 +2,11 @@ from abc import ABC, abstractmethod
 from typing import Dict, List, Any, Optional
 from datetime import datetime
 from dataclasses import dataclass, field
+try:
+    from app.services.fiscal_service import FiscalService
+except ImportError:
+    # Fallback for standalone tests or path issues
+    FiscalService = None
 
 @dataclass
 class Trade:
@@ -23,6 +28,17 @@ class Position:
 class Broker(ABC):
     @abstractmethod
     async def get_balance(self) -> float:
+        """Returns the current cash balance."""
+        return 0.0
+
+    @abstractmethod
+    async def get_equity(self) -> float:
+        """Returns the total equity (cash + position value)."""
+        return 0.0
+
+    @abstractmethod
+    async def get_net_equity(self, domicile: str = "international") -> float:
+        """Returns the net equity after estimated taxes."""
         return 0.0
 
     @abstractmethod
@@ -46,6 +62,24 @@ class LocalBroker(Broker):
 
     async def get_balance(self) -> float:
         return self.balance
+
+    async def get_equity(self) -> float:
+        """Returns balance + current market value of all positions."""
+        # Note: In a real simulation, we'd need current prices from a market service.
+        # Here we assume self.equity is updated via update_pnl.
+        return self.equity
+
+    async def get_net_equity(self, domicile: str = "international") -> float:
+        """Calculates equity net of estimated taxes on unrealized profits."""
+        total_unrealized_pnl = sum(p.unrealized_pnl for p in self.positions.values())
+        
+        if FiscalService and total_unrealized_pnl > 0:
+            # Estimate tax on unrealized profit as if we sold everything now
+            net_profit = FiscalService.calculate_net_profit(total_unrealized_pnl, domicile)
+            tax_liability = total_unrealized_pnl - net_profit
+            return self.equity - tax_liability
+            
+        return self.equity
 
     async def submit_order(self, symbol: str, side: str, qty: float, current_price: float, order_type: str = "market") -> Optional[Trade]:
         """Submit an order with the provided price (simulated fill)."""

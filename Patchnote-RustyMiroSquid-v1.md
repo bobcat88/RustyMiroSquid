@@ -1,5 +1,49 @@
 # Patchnote-RustyMiroSquid-v1.md
 
+## [v1.6.0] — 2026-04-05
+
+### TECH
+- Intégration de `FiscalService` pour le calcul du PFU 31.4% (Flat Tax).
+- Ajustement de `TradingPolicy` pour compenser la pression fiscale (Min R:R 4.0).
+- Audit complet des dépendances et de l'architecture (voir `audit_report.md`).
+- Définition de la stratégie d'intégration API Alpaca (Paper Trading) et IBKR (Production).
+
+### FUNCTION
+- Les agents sont désormais "Tax-Aware" et affichent leur Equity Nette Estimée.
+
+## 1.5.0 — 2026-04-05
+
+### TECH
+- Bibliothèque de Personas réelles (`personas_v1.json`) basée sur des profils emblématiques (Whale, Innovateur, Macro, Retail).
+- Support du chargement dynamique des Personas dans `TradingAgent` via `archetype`.
+- Amélioration de l'injection de prompts MTF dans `MarketMediaBridge` avec formatage [TREND] vs [ENTRIES].
+- Mise à jour de `TradingAction` avec le renommage des directions (BULLISH/BEARISH) pour la clarté opérationnelle.
+
+### FUNCTION
+- Validation SMC stricte via `TradingPolicy` (HTF Bias + LTF Sweep + LTF MSS).
+- Intégration des personas dans le comportement social et décisionnel de l'agent (Risk adjustment & Persona specific context).
+- Support du scale-out automatique à 2.0 R:R pour les agents institutionnels.
+
+### QoL
+- Prompts d'agents enrichis avec des rappels de stratégie institutionnelle (3-Step Confluence).
+
+## 1.4.0 — 2026-04-05
+
+## 1.3.0 — 2026-04-05
+
+### TECH
+- Intégration complète du toolkit `TradingAction` avec héritage de `PolymarketAction`.
+- Injection automatique de l'agent (`LocalBroker` & `TradingPolicy`) dans la couche d'action au runtime.
+- Mise à jour de la boucle de simulation (`run_parallel_simulation.py`) pour l'injection temps-réel du portfolio.
+- Support hybride des outils : Trading d'actions + Marchés de prédiction (Polymarket).
+
+### FUNCTION
+- Les agents peuvent désormais soumettre des ordres (`submit_market_order`), consulter leur portfolio et valider leurs risques via des outils LLM.
+- Les décisions de trading sont désormais contraintes par la `TradingPolicy` (gestion du risque dynamique).
+
+### BUGFIX
+- Correction de l'identification des agents dans les logs de simulation inter-plateformes (`Twitter`/`Reddit`/`Polymarket`).
+
 ## 1.2.0 — 2026-04-05
 
 ### TECH

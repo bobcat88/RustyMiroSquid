@@ -15,6 +15,7 @@ class TradingArchetype:
     preference_plan: str
     base_bio: str
     base_persona: str
+    base_balance: float
 
 ARCHETYPES = {
     "Institutional Whale": TradingArchetype(
@@ -23,7 +24,8 @@ ARCHETYPES = {
         risk_tolerance="low",
         preference_plan="Plan ETF",
         base_bio="Hedge fund manager with 20+ years of institutional experience. Focused on capital preservation and long-term yield.",
-        base_persona="You are a seasoned institutional trader. You ignore retail noise and focus on volume profiles and macro-economic shifts. You prefer ETF-based tactical allocations (OVTLYR Plan ETF) and Sit In Cash (SICADFU) when volatility is too high."
+        base_persona="You are a seasoned institutional trader. You ignore retail noise and focus on volume profiles and macro-economic shifts. You prefer ETF-based tactical allocations (OVTLYR Plan ETF) and Sit In Cash (SICADFU) when volatility is too high.",
+        base_balance=10000000.0  # $10M
     ),
     "Aggressive Alpha": TradingArchetype(
         name="Aggressive Alpha",
@@ -31,7 +33,8 @@ ARCHETYPES = {
         risk_tolerance="high",
         preference_plan="Plan A",
         base_bio="Proprietary trader specializing in momentum breakouts and alpha generation. Known for aggressive sizing on high-probability setups.",
-        base_persona="You are an aggressive momentum trader. You seek high-volatility breakouts (OVTLYR Plan A). You use SMC signals to scalp entries and exits with high precision. You are comfortable with high risk for high alpha."
+        base_persona="You are an aggressive momentum trader. You seek high-volatility breakouts (OVTLYR Plan A). You use SMC signals to scalp entries and exits with high precision. You are comfortable with high risk for high alpha.",
+        base_balance=250000.0  # $250k
     ),
     "SMC Sniper": TradingArchetype(
         name="SMC Sniper",
@@ -39,7 +42,8 @@ ARCHETYPES = {
         risk_tolerance="moderate",
         preference_plan="Plan M",
         base_bio="Technical analyst mastering Smart Money Concepts (SMC). Waits for Fair Value Gaps (FVG) and Order Blocks (OB) to align with OVTLYR plans.",
-        base_persona="You are a patient SMC trader. You only enter when price returns to a valid Order Block or fills a Fair Value Gap. You use OVTLYR Plan M (Moderate) to filter your signals. You prioritize high Risk/Reward ratios over trade frequency."
+        base_persona="You are a patient SMC trader. You only enter when price returns to a valid Order Block or fills a Fair Value Gap. You use OVTLYR Plan M (Moderate) to filter your signals. You prioritize high Risk/Reward ratios over trade frequency.",
+        base_balance=100000.0  # $100k
     ),
     "Retail Reactor": TradingArchetype(
         name="Retail Reactor",
@@ -47,7 +51,8 @@ ARCHETYPES = {
         risk_tolerance="moderate",
         preference_plan="Plan A",
         base_bio="Individual trader active on social media. Closely follows market news and 'Market Color' sentiment indicators.",
-        base_persona="You are a retail trader heavily influenced by the 'Market Color' (Fear/Greed). You react quickly to news triggers and RSS feeds. You are prone to FOMO in Greed and FUD in Fear. You look for validation from other traders before acting."
+        base_persona="You are a retail trader heavily influenced by the 'Market Color' (Fear/Greed). You react quickly to news triggers and RSS feeds. You are prone to FOMO in Greed and FUD in Fear. You look for validation from other traders before acting.",
+        base_balance=10000.0  # $10k
     )
 }
 

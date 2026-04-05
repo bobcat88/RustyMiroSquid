@@ -170,6 +170,7 @@ from market_media_bridge import (
     inject_market_context,
     inject_sentiment_context,
     inject_trigger_context,
+    inject_portfolio_context,
 )
 
 try:
@@ -185,6 +186,8 @@ try:
         AgentGraph,
     )
     from wonderwall.social_agent.agent import SocialAgent
+    from wonderwall.social_agent.trading_agent import TradingAgent
+    from wonderwall.social_agent.trading_action import TradingAction
     from wonderwall.social_platform.config import UserInfo
     from wonderwall.simulations.polymarket import polymarket_simulation
 except ImportError as e:
@@ -1711,12 +1714,14 @@ def _build_polymarket_agent_graph(
                 }
             },
         )
-        agent = SocialAgent(
+        agent = TradingAgent(
             agent_id=agent_id,
             user_info=user_info,
             model=model,
             agent_graph=agent_graph,
             simulation=polymarket_simulation,
+            initial_balance=ARCHETYPES[archetype_name].base_balance,
+            archetype=archetype_name
         )
         agent_graph.add_agent(agent)
 
@@ -1811,6 +1816,10 @@ async def run_polymarket_simulation(
         if main_logger:
             main_logger.info(f"[Polymarket] {msg}")
         print(f"[Polymarket] {msg}")
+
+    # Initialize Trigger Service (Real-world market data)
+    trigger_service = TriggerService()
+    log_info("Trigger Service (yfinance + News): ENABLED")
 
     log_info("Initializing...")
 
@@ -1957,6 +1966,22 @@ async def run_polymarket_simulation(
             if sentiment_prompt:
                 for _, agent in active_agents:
                     inject_sentiment_context(agent, sentiment_prompt)
+
+        # ── Update Real-world Triggers ──
+        trigger_data = await trigger_service.update()
+        if market_media_bridge:
+            market_media_bridge.update_triggers(trigger_data, round_num)
+        trigger_prompt = market_media_bridge.get_trigger_prompt() if market_media_bridge else None
+        
+        if trigger_prompt:
+            for _, agent in active_agents:
+                inject_trigger_context(agent, trigger_prompt)
+
+        # ── Global Portfolio Injection ──
+        for _, agent in active_agents:
+            if isinstance(agent, TradingAgent):
+                portfolio_summary = await agent.get_portfolio_summary()
+                inject_portfolio_context(agent, portfolio_summary)
 
         actions = {agent: LLMAction() for _, agent in active_agents}
         await result.env.step(actions)
@@ -2230,6 +2255,14 @@ async def run_synchronized_simulation(
         trigger_data = await trigger_service.update()
         bridge.update_triggers(trigger_data, round_num)
         trigger_prompt = bridge.get_trigger_prompt()
+        
+        # Attach to environments for tool access
+        if twitter_result is not None and hasattr(twitter_result, 'env'):
+            twitter_result.env.latest_triggers = bridge.latest_triggers
+        if reddit_result is not None and hasattr(reddit_result, 'env'):
+            reddit_result.env.latest_triggers = bridge.latest_triggers
+        if polymarket_result is not None and hasattr(polymarket_result, 'env'):
+            polymarket_result.env.latest_triggers = bridge.latest_triggers
 
         # ── All 3 platforms run simultaneously ──
         # Build shared context once (previous rounds only — current round is empty)
@@ -2248,12 +2281,18 @@ async def run_synchronized_simulation(
                 if market_prompt:
                     for _, agent in active:
                         inject_market_context(agent, market_prompt)
-                        digest = cross_platform_log.build_digest(agent_id, exclude_platform="twitter")
+                        digest = cross_platform_log.build_digest(agent.social_agent_id, exclude_platform="twitter")
                         if digest:
                             inject_cross_platform_context(agent, digest)
                 if trigger_prompt:
                     for _, agent in active:
                         inject_trigger_context(agent, trigger_prompt)
+                
+                # Global Portfolio Injection
+                for _, agent in active:
+                    if isinstance(agent, TradingAgent):
+                        portfolio_summary = await agent.get_portfolio_summary()
+                        inject_portfolio_context(agent, portfolio_summary)
 
                 async def _step_twitter(active_agents=active):
                     actions = {agent: LLMAction() for _, agent in active_agents}
@@ -2277,6 +2316,12 @@ async def run_synchronized_simulation(
                 if trigger_prompt:
                     for _, agent in active:
                         inject_trigger_context(agent, trigger_prompt)
+
+                # Global Portfolio Injection
+                for _, agent in active:
+                    if isinstance(agent, TradingAgent):
+                        portfolio_summary = await agent.get_portfolio_summary()
+                        inject_portfolio_context(agent, portfolio_summary)
 
                 async def _step_reddit(active_agents=active):
                     actions = {agent: LLMAction() for _, agent in active_agents}
@@ -2303,6 +2348,12 @@ async def run_synchronized_simulation(
                 if trigger_prompt:
                     for _, agent in active:
                         inject_trigger_context(agent, trigger_prompt)
+
+                # Global Portfolio Injection
+                for _, agent in active:
+                    if isinstance(agent, TradingAgent):
+                        portfolio_summary = await agent.get_portfolio_summary()
+                        inject_portfolio_context(agent, portfolio_summary)
 
                 # Inject social media summary directly into the observation prompt
                 # so traders see it alongside portfolio/market data (not buried in system msg)
