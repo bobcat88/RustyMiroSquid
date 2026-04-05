@@ -162,12 +162,15 @@ def init_logging_for_simulation(simulation_dir: str):
 from action_logger import SimulationLogManager, PlatformActionLogger
 from cross_platform_digest import CrossPlatformLog, inject_cross_platform_context
 from belief_integration import BeliefTracker
+from round_memory import RoundMemory, inject_round_memory
+from app.services.trigger_service import TriggerService
+from app.services.trading_persona_factory import TradingPersonaFactory, ARCHETYPES
 from market_media_bridge import (
     MarketMediaBridge,
     inject_market_context,
     inject_sentiment_context,
+    inject_trigger_context,
 )
-from round_memory import RoundMemory, inject_round_memory
 
 try:
     from camel.models import ModelFactory
@@ -1679,20 +1682,32 @@ def _build_polymarket_agent_graph(
     Each profile has: user_id, name, description, risk_tolerance, user_profile.
     Agents are created with simulation=polymarket_simulation so they use
     PolymarketAction / PolymarketEnvironment / PolymarketPromptBuilder.
+    
+    Now integrated with TradingPersonaFactory to assign specialized archetypes.
     """
     agent_graph = AgentGraph()
+    archetype_names = list(ARCHETYPES.keys())
 
-    for profile in profiles:
+    for i, profile in enumerate(profiles):
         agent_id = profile["user_id"]
-        # Use description as readable name if "name" looks like a username
+        
+        # Determine archetype (round-robin or random)
+        archetype_name = archetype_names[i % len(archetype_names)]
+        persona = TradingPersonaFactory.generate_persona(archetype_name, agent_id)
+        
+        # Blend original profile with archetype persona
         display_name = profile.get("display_name") or profile.get("description", "") or profile["name"]
+        
+        # We prioritize the Persona Factory's bio and persona for specialized behavior
         user_info = UserInfo(
-            name=display_name,
-            description=profile.get("description", ""),
+            name=f"{display_name} ({archetype_name})",
+            description=f"{persona.bio} {profile.get('description', '')}",
             profile={
                 "other_info": {
-                    "user_profile": profile.get("user_profile", ""),
-                    "risk_tolerance": profile.get("risk_tolerance", "moderate"),
+                    "user_profile": f"{persona.persona}\n\nBackground: {profile.get('user_profile', '')}",
+                    "risk_tolerance": persona.risk_tolerance,
+                    "trading_archetype": archetype_name,
+                    "ovtlyR_plan": ARCHETYPES[archetype_name].preference_plan
                 }
             },
         )
@@ -2051,6 +2066,10 @@ async def run_synchronized_simulation(
     )
     log_info("Round Memory: ENABLED")
 
+    # Initialize Trigger Service (Real-world market data)
+    trigger_service = TriggerService()
+    log_info("Trigger Service (yfinance + News): ENABLED")
+
     # ── Setup phase: initialize all platform environments in parallel ──
     twitter_result = None
     reddit_result = None
@@ -2206,6 +2225,12 @@ async def run_synchronized_simulation(
         # ── Initialize round memory for this round ──
         round_memory.start_round(round_num, simulated_day, simulated_hour)
 
+        # ── Update Real-world Triggers ──
+        log_info(f"Round {round_num+1}: Updating market triggers...")
+        trigger_data = await trigger_service.update()
+        bridge.update_triggers(trigger_data, round_num)
+        trigger_prompt = bridge.get_trigger_prompt()
+
         # ── All 3 platforms run simultaneously ──
         # Build shared context once (previous rounds only — current round is empty)
         memory_ctx = round_memory.build_context(round_num)
@@ -2223,11 +2248,12 @@ async def run_synchronized_simulation(
                 if market_prompt:
                     for _, agent in active:
                         inject_market_context(agent, market_prompt)
-                if cross_platform_log:
-                    for agent_id, agent in active:
                         digest = cross_platform_log.build_digest(agent_id, exclude_platform="twitter")
                         if digest:
                             inject_cross_platform_context(agent, digest)
+                if trigger_prompt:
+                    for _, agent in active:
+                        inject_trigger_context(agent, trigger_prompt)
 
                 async def _step_twitter(active_agents=active):
                     actions = {agent: LLMAction() for _, agent in active_agents}
@@ -2245,11 +2271,12 @@ async def run_synchronized_simulation(
                 if market_prompt:
                     for _, agent in active:
                         inject_market_context(agent, market_prompt)
-                if cross_platform_log:
-                    for agent_id, agent in active:
                         digest = cross_platform_log.build_digest(agent_id, exclude_platform="reddit")
                         if digest:
                             inject_cross_platform_context(agent, digest)
+                if trigger_prompt:
+                    for _, agent in active:
+                        inject_trigger_context(agent, trigger_prompt)
 
                 async def _step_reddit(active_agents=active):
                     actions = {agent: LLMAction() for _, agent in active_agents}
@@ -2270,11 +2297,12 @@ async def run_synchronized_simulation(
                 if market_prompt:
                     for _, agent in active:
                         inject_market_context(agent, market_prompt)
-                if cross_platform_log:
-                    for agent_id, agent in active:
                         digest = cross_platform_log.build_digest(agent_id, exclude_platform="polymarket")
                         if digest:
                             inject_cross_platform_context(agent, digest)
+                if trigger_prompt:
+                    for _, agent in active:
+                        inject_trigger_context(agent, trigger_prompt)
 
                 # Inject social media summary directly into the observation prompt
                 # so traders see it alongside portfolio/market data (not buried in system msg)

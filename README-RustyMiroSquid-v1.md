@@ -28,13 +28,14 @@ Le projet a été forké pour intégrer des optimisations de performance (Neo4j,
 Voir le fichier `.env.example` pour la liste complète (LLM_API_KEY, NEO4J_URI, etc.).
 
 ## Structure du Projet
-- `/backend` : Moteur de simulation (Python).
-- `/frontend` : Interface utilisateur (React).
-- `/docs` : Documentation technique et images.
+- `/backend` : Moteur de simulation (Python, TriggerService, TradingPersonaFactory).
+- `/frontend` : Interface utilisateur (React, Dashboard expansion).
+- `/docs` : Documentation technique, analyses stratégiques et images.
 
 ## Modèle de Données Projet
 - **Graph** : Entités et relations extraites via LLM.
-- **Agents** : Personas avec états de croyance (stance, confidence, trust).
+- **Agents** : Personas avec états de croyance (stance, confidence, trust) + Archetypes Trading (Whale, Alpha, Sniper, Reactor).
+- **Triggers** : Snapshot de microstructure (Market Color, SMC Signals, RSS News).
 
 ## Context for Claude
 Ce projet utilise le standard **PROUST v3.0**. Pour reprendre le contexte :

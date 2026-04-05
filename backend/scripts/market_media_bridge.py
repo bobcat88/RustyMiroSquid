@@ -14,9 +14,12 @@ which models real-world information lag between markets and social media.
 
 from __future__ import annotations
 
+import logging
 import sqlite3
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
+
+logger = logging.getLogger('miroshark.bridge')
 
 
 @dataclass
@@ -113,14 +116,64 @@ class SentimentSnapshot:
                 lines.append(f"    Key argument: \"{top_arg[:150]}\"")
             lines.append("")
 
-        if self.viral_posts:
+        posts = self.viral_posts
+        if posts:
             lines.append("  Most discussed posts:")
-            for vp in self.viral_posts[:3]:
+            # Use a loop instead of slice to satisfy strict type checkers
+            count = 0
+            for vp in posts:
+                if count >= 3:
+                    break
                 content = vp.get("content", "")[:120]
                 likes = vp.get("num_likes", 0)
                 lines.append(f"    - \"{content}\" ({likes} likes)")
+                count += 1
             lines.append("")
 
+        return "\n".join(lines)
+
+
+@dataclass
+class TriggerSnapshot:
+    """News triggers, market color, and SMC signals from TriggerService."""
+    round_num: int = 0
+    market_color: str = "Neutral"
+    sentiment_score: float = 0.0
+    rss_headlines: List[str] = field(default_factory=list)
+    smc_signals: Dict[str, List[str]] = field(default_factory=dict)
+    price_data: Dict[str, float] = field(default_factory=dict)
+
+    def to_agent_prompt(self) -> str:
+        """Format trigger data for injection into agent prompts."""
+        lines = ["# GLOBAL MARKET COLOR & TRIGGERS"]
+        lines.append(f"Current Market Mood: **{self.market_color}** (Sentiment: {self.sentiment_score:+.2f})")
+        lines.append("This data reflects real-world market conditions (yfinance + News RSS).")
+        lines.append("")
+
+        if self.rss_headlines:
+            lines.append("## RECENT HEADLINES")
+            count = 0
+            for h in self.rss_headlines:
+                if count >= 5:
+                    break
+                lines.append(f" - {h}")
+                count += 1
+            lines.append("")
+
+        if self.smc_signals:
+            lines.append("## SMART MONEY CONCEPTS (SMC) SIGNALS")
+            for symbol, signals in self.smc_signals.items():
+                if signals:
+                    lines.append(f" - **{symbol}**: {', '.join(signals)}")
+            lines.append("")
+
+        if self.price_data:
+            lines.append("## REAL-WORLD PRICES")
+            for symbol, price in self.price_data.items():
+                lines.append(f" - {symbol}: ${price:.2f}")
+
+        lines.append("")
+        lines.append("Consider these signals for your strategy.")
         return "\n".join(lines)
 
 
@@ -148,6 +201,7 @@ class MarketMediaBridge:
     def __init__(self):
         self.latest_prices: Optional[MarketSnapshot] = None
         self.latest_sentiment: Optional[SentimentSnapshot] = None
+        self.latest_triggers: Optional[TriggerSnapshot] = None
         self._price_history: List[MarketSnapshot] = []
 
     # ── Polymarket → Social Media ──────────────────────────────
@@ -179,8 +233,9 @@ class MarketMediaBridge:
 
                 # Compute price delta from last snapshot
                 prev_price = 0.5
-                if self.latest_prices:
-                    for pm in self.latest_prices.markets:
+                prices = self.latest_prices
+                if prices is not None:
+                    for pm in prices.markets:
                         if pm.get("market_id") == row["market_id"]:
                             prev_price = pm.get("price_yes", 0.5)
                             break
@@ -205,9 +260,10 @@ class MarketMediaBridge:
 
     def get_market_prompt(self) -> str:
         """Called by Twitter/Reddit loops to get current market prices for agent injection."""
-        if not self.latest_prices or not self.latest_prices.markets:
+        prices = self.latest_prices
+        if prices is None or not hasattr(prices, 'to_social_media_prompt'):
             return ""
-        return self.latest_prices.to_social_media_prompt()
+        return prices.to_social_media_prompt()
 
     # ── Social Media → Polymarket ──────────────────────────────
 
@@ -262,27 +318,53 @@ class MarketMediaBridge:
                         break
 
         # Find viral posts from actions
-        viral_posts = []
+        viral_posts_list = []
         for a in (actual_actions or []):
             if a.get("action_type") == "CREATE_POST":
-                viral_posts.append({
+                viral_posts_list.append({
                     "content": a.get("action_args", {}).get("content", ""),
                     "num_likes": 0,  # We don't have likes yet for this round's posts
                     "agent_name": a.get("agent_name", ""),
                 })
 
+        # Cap viral posts (explicitly loop to satisfy strict type checkers)
+        limited_viral = []
+        for vp in viral_posts_list:
+            if len(limited_viral) >= 5:
+                break
+            limited_viral.append(vp)
+
         self.latest_sentiment = SentimentSnapshot(
             round_num=round_num,
             platform=platform,
             topic_sentiments=topic_sentiments,
-            viral_posts=viral_posts[:5],
+            viral_posts=limited_viral,
         )
 
     def get_sentiment_prompt(self) -> str:
         """Called by Polymarket loop to get social media sentiment for trader injection."""
-        if not self.latest_sentiment:
+        sentiment = self.latest_sentiment
+        if sentiment is None:
             return ""
-        return self.latest_sentiment.to_trading_prompt()
+        return sentiment.to_trading_prompt()
+
+    def update_triggers(self, trigger_data: Dict[str, Any], round_num: int):
+        """Update the bridge with real-world market color and news triggers."""
+        self.latest_triggers = TriggerSnapshot(
+            round_num=round_num,
+            market_color=trigger_data.get("market_color", "Neutral"),
+            sentiment_score=trigger_data.get("sentiment_score", 0.0),
+            rss_headlines=trigger_data.get("headlines", []),
+            smc_signals=trigger_data.get("smc_signals", {}),
+            price_data=trigger_data.get("prices", {})
+        )
+
+    def get_trigger_prompt(self) -> str:
+        """Get the formatted market color and triggers prompt."""
+        triggers = self.latest_triggers
+        if triggers is None:
+            return ""
+        return triggers.to_agent_prompt()
 
 
 # ── Injection helpers (same pattern as cross_platform_digest) ──
@@ -319,3 +401,21 @@ def inject_sentiment_context(agent, sentiment_text: str):
         else:
             content = content[:marker_pos]
     agent.system_message.content = content + "\n\n" + sentiment_text
+
+
+_TRIGGER_MARKER = "\n\n# GLOBAL MARKET COLOR & TRIGGERS"
+
+
+def inject_trigger_context(agent, trigger_text: str):
+    """Inject real-world market color and triggers into an agent's system message."""
+    if not trigger_text:
+        return
+    content = agent.system_message.content
+    marker_pos = content.find(_TRIGGER_MARKER)
+    if marker_pos != -1:
+        next_marker = content.find("\n\n# ", marker_pos + len(_TRIGGER_MARKER))
+        if next_marker != -1:
+            content = content[:marker_pos] + content[next_marker:]
+        else:
+            content = content[:marker_pos]
+    agent.system_message.content = content + "\n\n" + trigger_text
