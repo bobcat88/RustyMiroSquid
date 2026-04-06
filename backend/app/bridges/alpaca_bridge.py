@@ -34,13 +34,21 @@ class AlpacaBroker(BaseBroker):
 
     async def get_balance(self) -> float:
         """Returns the current buying power (cash)."""
-        account = self.trading_client.get_account()
-        return float(account.buying_power)
+        try:
+            account = self.trading_client.get_account()
+            return float(account.buying_power)
+        except Exception as e:
+            logger.error(f"Alpaca get_balance failed: {e}")
+            return 0.0
 
     async def get_equity(self) -> float:
         """Returns the total portfolio value (equity)."""
-        account = self.trading_client.get_account()
-        return float(account.equity)
+        try:
+            account = self.trading_client.get_account()
+            return float(account.equity)
+        except Exception as e:
+            logger.error(f"Alpaca get_equity failed: {e}")
+            return 0.0
 
     async def get_net_equity(self, domicile: str = "France") -> float:
         """Calculates equity net of estimated taxes on profits."""

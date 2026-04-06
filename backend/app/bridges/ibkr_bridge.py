@@ -38,21 +38,27 @@ class IBKRBroker(BaseBroker):
 
     async def get_balance(self) -> float:
         """Returns the current cash balance."""
-        await self.connect()
-        # Summary returns a list of AccountValue objects
-        summary = self.ib.accountSummary()
-        for item in summary:
-            if item.tag == "CashBalance" and item.currency == "USD":
-                return float(item.value)
+        try:
+            await self.connect()
+            # Summary returns a list of AccountValue objects
+            summary = self.ib.accountSummary()
+            for item in summary:
+                if item.tag == "CashBalance" and item.currency == "USD":
+                    return float(item.value)
+        except Exception as e:
+            logger.error(f"IBKR get_balance failed: {e}")
         return 0.0
 
     async def get_equity(self) -> float:
         """Returns the total Net Liquidation value."""
-        await self.connect()
-        summary = self.ib.accountSummary()
-        for item in summary:
-            if item.tag == "NetLiquidation" and item.currency == "USD":
-                return float(item.value)
+        try:
+            await self.connect()
+            summary = self.ib.accountSummary()
+            for item in summary:
+                if item.tag == "NetLiquidation" and item.currency == "USD":
+                    return float(item.value)
+        except Exception as e:
+            logger.error(f"IBKR get_equity failed: {e}")
         return 0.0
 
     async def get_net_equity(self, domicile: str = "France") -> float:
@@ -111,17 +117,21 @@ class IBKRBroker(BaseBroker):
 
     async def get_positions(self) -> List[Position]:
         """List all current positions in IBKR."""
-        await self.connect()
-        ib_positions = self.ib.positions()
-        positions = []
-        for p in ib_positions:
-            # Fetch market price for PnL
-            ticker = self.ib.reqTickers(p.contract)[0]
-            mkt_price = ticker.marketPrice() if ticker.marketPrice() > 0 else p.avgCost
-            positions.append(Position(
-                symbol=p.contract.symbol,
-                qty=p.quantity,
-                avg_price=p.avgCost,
-                unrealized_pnl=(mkt_price - p.avgCost) * p.quantity
-            ))
-        return positions
+        try:
+            await self.connect()
+            ib_positions = self.ib.positions()
+            positions = []
+            for p in ib_positions:
+                # Fetch market price for PnL
+                ticker = self.ib.reqTickers(p.contract)[0]
+                mkt_price = ticker.marketPrice() if ticker.marketPrice() > 0 else p.avgCost
+                positions.append(Position(
+                    symbol=p.contract.symbol,
+                    qty=p.quantity,
+                    avg_price=p.avgCost,
+                    unrealized_pnl=(mkt_price - p.avgCost) * p.quantity
+                ))
+            return positions
+        except Exception as e:
+            logger.error(f"IBKR get_positions failed: {e}")
+            return []
