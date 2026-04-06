@@ -8,6 +8,7 @@ from fastapi import HTTPException
 from typing import List, Dict, Any
 
 from . import templates_router
+from ..schemas import SuccessResponse
 from ..utils.logger import get_logger
 
 logger = get_logger('rustymirosquid.api.templates')
@@ -35,7 +36,7 @@ def _load_templates():
     return templates
 
 
-@templates_router.get('/list')
+@templates_router.get('/list', response_model=SuccessResponse)
 async def list_templates():
     """
     List all available simulation templates.
@@ -58,18 +59,18 @@ async def list_templates():
                 "tags": t.get("tags", []),
             })
 
-        return {
-            "success": True,
-            "data": summaries,
-            "count": len(summaries)
-        }
+        return SuccessResponse(
+            success=True,
+            data=summaries,
+            count=len(summaries)
+        )
 
     except Exception as e:
         logger.error(f"Failed to list templates: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@templates_router.get('/{template_id}')
+@templates_router.get('/{template_id}', response_model=SuccessResponse)
 async def get_template(template_id: str):
     """
     Get a single template by ID.
@@ -87,10 +88,10 @@ async def get_template(template_id: str):
         with open(filepath, 'r', encoding='utf-8') as f:
             template = json.load(f)
 
-        return {
-            "success": True,
-            "data": template
-        }
+        return SuccessResponse(
+            success=True,
+            data=template
+        )
 
     except HTTPException:
         raise

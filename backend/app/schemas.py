@@ -62,6 +62,32 @@ class CreateSimulationRequest(BaseModel):
     enable_reddit: bool = True
     enable_polymarket: bool = False
 
+class PrepareSimulationRequest(BaseModel):
+    simulation_id: str
+    force_regenerate: bool = False
+
+class PrepareStatusRequest(BaseModel):
+    task_id: Optional[str] = None
+    simulation_id: Optional[str] = None
+
+class GenerateProfilesRequest(BaseModel):
+    graph_id: str
+    entity_types: Optional[List[str]] = None
+    use_llm: bool = True
+    platform: str = "reddit"
+
+class StartSimulationRequest(BaseModel):
+    simulation_id: str
+    platform: str = 'parallel'
+    max_rounds: Optional[int] = None
+    enable_graph_memory_update: bool = False
+    force: bool = False
+    resume: bool = False
+    enable_cross_platform: bool = True
+
+class StopSimulationRequest(BaseModel):
+    simulation_id: str
+
 class SimulationState(BaseModel):
     simulation_id: str
     project_id: str
@@ -73,3 +99,25 @@ class SimulationState(BaseModel):
     entities_count: int = 0
     created_at: str
     updated_at: Optional[str] = None
+
+class GenerateReportRequest(BaseModel):
+    simulation_id: str
+    force_regenerate: bool = False
+
+class GenerateStatusRequest(BaseModel):
+    task_id: Optional[str] = None
+    simulation_id: Optional[str] = None
+
+class ReportChatRequest(BaseModel):
+    simulation_id: str
+    message: str
+    chat_history: List[Dict[str, Any]] = []
+
+class ReportResponse(BaseModel):
+    report_id: str
+    simulation_id: str
+    status: str
+    outline: Optional[Dict[str, Any]] = None
+    markdown_content: Optional[str] = None
+    created_at: str
+    completed_at: Optional[str] = None

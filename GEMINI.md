@@ -16,7 +16,7 @@ Ce fichier sert de point d'entrée pour l'agent IA (Claude/Gemini) pour comprend
 ## Architecture & Stack
 
 - **Frontend** : Vue 3.5 + Vite 7 + D3.js + Vue Router (Gestion via **Bun**)
-- **Backend** : Flask 3 (Migration FastAPI prévue) + Python 3.12 + **uv**
+- **Backend** : FastAPI 0.115+ (Migrated) + Python 3.12 + **uv**
 - **Graph DB** : Neo4j 5.15
 - **LLM** : Ollama (Modèle : `qwen3:32b`)
 - **Agents AI** : camel-ai v0.2.78 (Version verrouillée)

@@ -169,23 +169,23 @@ async def get_entities_by_type(request: Request, graph_id: str, entity_type: str
         raise HTTPException(status_code=500, detail=str(e))
 
 
+from ..schemas import CreateSimulationRequest, PrepareSimulationRequest, PrepareStatusRequest, GenerateProfilesRequest, StartSimulationRequest, StopSimulationRequest
+
+
 # ============== Simulation Management Endpoints ==============
 
 @simulation_router.post('/create', response_model=SuccessResponse)
-async def create_simulation(data: Dict[str, Any] = Body(...)):
+async def create_simulation(payload: CreateSimulationRequest):
     """
     Create a new simulation
     """
     try:
-        project_id = data.get('project_id')
-        if not project_id:
-            raise HTTPException(status_code=400, detail="Please provide project_id")
-        
+        project_id = payload.project_id
         project = ProjectManager.get_project(project_id)
         if not project:
             raise HTTPException(status_code=404, detail=f"Project not found: {project_id}")
         
-        graph_id = data.get('graph_id') or project.graph_id
+        graph_id = payload.graph_id or project.graph_id
         if not graph_id:
             raise HTTPException(status_code=400, detail="Graph not yet built for this project, please call /api/graph/build first")
         
@@ -193,12 +193,12 @@ async def create_simulation(data: Dict[str, Any] = Body(...)):
         state = manager.create_simulation(
             project_id=project_id,
             graph_id=graph_id,
-            enable_twitter=data.get('enable_twitter', True),
-            enable_reddit=data.get('enable_reddit', True),
-            enable_polymarket=data.get('enable_polymarket', False),
+            enable_twitter=payload.enable_twitter,
+            enable_reddit=payload.enable_reddit,
+            enable_polymarket=payload.enable_polymarket,
         )
         
-        return SuccessResponse(success=True, data=state.to_dict())
+        return SuccessResponse(success=True, data=state.to_simple_dict())
         
     except HTTPException:
         raise
@@ -327,22 +327,19 @@ def _check_simulation_prepared(simulation_id: str) -> tuple:
 
 
 @simulation_router.post('/prepare', response_model=SuccessResponse)
-async def prepare_simulation(background_tasks: BackgroundTasks, data: Dict[str, Any] = Body(...)):
+async def prepare_simulation(request: Request, background_tasks: BackgroundTasks, payload: PrepareSimulationRequest):
     """
     Step 2: Prepare simulation
     """
+    from ..models.task import TaskManager
     try:
-        simulation_id = data.get('simulation_id')
-        if not simulation_id:
-            raise HTTPException(status_code=400, detail="Please provide simulation_id")
-        
+        simulation_id = payload.simulation_id
         manager = SimulationManager()
         state = manager.get_simulation(simulation_id)
         if not state:
             raise HTTPException(status_code=404, detail=f"Simulation not found: {simulation_id}")
         
-        force_regenerate = data.get('force_regenerate', False)
-        if not force_regenerate:
+        if not payload.force_regenerate:
             is_prepared, prepare_info = _check_simulation_prepared(simulation_id)
             if is_prepared:
                 return SuccessResponse(success=True, data={
@@ -353,11 +350,24 @@ async def prepare_simulation(background_tasks: BackgroundTasks, data: Dict[str, 
                     "prepare_info": prepare_info
                 })
         
+        # Get storage from app state
+        storage = request.app.state.neo4j_storage
+        if not storage:
+            raise HTTPException(status_code=503, detail="Neo4j storage not initialized")
+
+        # Create task
+        task_manager = TaskManager()
+        task_id = task_manager.create_task(
+            task_type="simulation_prepare",
+            metadata={"simulation_id": simulation_id}
+        )
+
         # Start background task
-        background_tasks.add_task(_run_prepare_task, simulation_id, data)
+        background_tasks.add_task(_run_prepare_task, simulation_id, task_id, storage)
         
         return SuccessResponse(success=True, data={
             "simulation_id": simulation_id,
+            "task_id": task_id,
             "status": "preparing",
             "message": "Preparation started in background"
         })
@@ -367,14 +377,47 @@ async def prepare_simulation(background_tasks: BackgroundTasks, data: Dict[str, 
         logger.error(f"Failed to start preparation: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-async def _run_prepare_task(simulation_id: str, data: dict):
-    # This replaces the internal threading logic
-    # I'll need to define this function properly or adapt the existing one
-    pass
+async def _run_prepare_task(simulation_id: str, task_id: str, storage: Any):
+    from ..models.task import TaskManager, TaskStatus
+    from ..models.project import ProjectManager
+    
+    task_manager = TaskManager()
+    try:
+        task_manager.update_task(task_id, status=TaskStatus.PROCESSING, progress=0, message="Initializing preparation...")
+        
+        manager = SimulationManager()
+        state = manager.get_simulation(simulation_id)
+        if not state:
+            raise ValueError(f"Simulation not found: {simulation_id}")
+            
+        project = ProjectManager.get_project(state.project_id)
+        if not project:
+            raise ValueError(f"Project not found: {state.project_id}")
+            
+        document_text = project.get_combined_text()
+        simulation_requirement = project.simulation_requirement
+        
+        def progress_callback(stage, progress, message, **kwargs):
+            task_manager.update_task(task_id, progress=progress, message=f"[{stage}] {message}")
+
+        # Run preparation
+        manager.prepare_simulation(
+            simulation_id=simulation_id,
+            simulation_requirement=simulation_requirement,
+            document_text=document_text,
+            progress_callback=progress_callback,
+            storage=storage
+        )
+        
+        task_manager.complete_task(task_id, result={"simulation_id": simulation_id, "status": "ready"})
+        
+    except Exception as e:
+        logger.error(f"Background preparation task failed: {str(e)}")
+        task_manager.fail_task(task_id, str(e))
 
 
 @simulation_router.post('/prepare/status', response_model=SuccessResponse)
-async def get_prepare_status(data: Dict[str, Any] = Body(...)):
+async def get_prepare_status(payload: PrepareStatusRequest):
     """
     Query preparation task progress
 
@@ -404,8 +447,8 @@ async def get_prepare_status(data: Dict[str, Any] = Body(...)):
     from ..models.task import TaskManager
     
     try:
-        task_id = data.get('task_id')
-        simulation_id = data.get('simulation_id')
+        task_id = payload.task_id
+        simulation_id = payload.simulation_id
         
         if simulation_id:
             is_prepared, prepare_info = _check_simulation_prepared(simulation_id)
@@ -889,22 +932,18 @@ async def download_simulation_script(script_name: str = Path(...)):
 # ============== Profile Generation Endpoint (standalone use) ==============
 
 @simulation_router.post('/generate-profiles', response_model=SuccessResponse)
-async def generate_profiles(data: dict = Body(...)):
+async def generate_profiles(request: Request, payload: GenerateProfilesRequest):
     """
     Directly generate OASIS Agent Profile from graph
     """
     try:
-        graph_id = data.get('graph_id')
-        if not graph_id:
-            raise HTTPException(status_code=400, detail="Please provide graph_id")
-        
-        entity_types = data.get('entity_types')
-        use_llm = data.get('use_llm', True)
-        platform = data.get('platform', 'reddit')
+        graph_id = payload.graph_id
+        entity_types = payload.entity_types
+        use_llm = payload.use_llm
+        platform = payload.platform
 
-        # Use dependencies for neo4j_storage if possible, but here we can keep it simple
-        from app.api import get_neo4j_storage
-        storage = get_neo4j_storage()
+        # Get storage from app state
+        storage = request.app.state.neo4j_storage
         if not storage:
             raise HTTPException(status_code=500, detail="GraphStorage not initialized")
             
@@ -918,7 +957,7 @@ async def generate_profiles(data: dict = Body(...)):
         if filtered.filtered_count == 0:
             raise HTTPException(status_code=400, detail="No matching entities found")
         
-        generator = OasisProfileGenerator()
+        generator = OasisProfileGenerator(storage=storage, graph_id=graph_id)
         profiles = generator.generate_profiles_from_entities(
             entities=filtered.entities,
             use_llm=use_llm
@@ -947,20 +986,18 @@ async def generate_profiles(data: dict = Body(...)):
 # ============== Simulation Run Control Endpoints ==============
 
 @simulation_router.post('/start', response_model=SuccessResponse)
-async def start_simulation(data: dict = Body(...)):
+async def start_simulation(request: Request, payload: StartSimulationRequest):
     """
     Start running simulation
     """
     try:
-        simulation_id = data.get('simulation_id')
-        if not simulation_id:
-            raise HTTPException(status_code=400, detail="Please provide simulation_id")
-
-        platform = data.get('platform', 'parallel')
-        max_rounds = data.get('max_rounds')
-        enable_graph_memory_update = data.get('enable_graph_memory_update', False)
-        force = data.get('force', False)
-        resume = data.get('resume', False)
+        simulation_id = payload.simulation_id
+        platform = payload.platform
+        max_rounds = payload.max_rounds
+        enable_graph_memory_update = payload.enable_graph_memory_update
+        force = payload.force
+        resume = payload.resume
+        enable_cross_platform = payload.enable_cross_platform
 
         start_round = 0
         if resume:
@@ -969,19 +1006,6 @@ async def start_simulation(data: dict = Body(...)):
                 start_round = existing_state.current_round
                 logger.info(f"Resuming simulation {simulation_id} from round {start_round}")
 
-        if max_rounds is not None:
-            try:
-                max_rounds = int(max_rounds)
-                if max_rounds <= 0:
-                    raise HTTPException(status_code=400, detail="max_rounds must be a positive integer")
-            except (ValueError, TypeError):
-                raise HTTPException(status_code=400, detail="max_rounds must be a valid integer")
-
-        if platform not in ['twitter', 'reddit', 'polymarket', 'parallel']:
-            raise HTTPException(status_code=400, detail=f"Invalid platform type: {platform}")
-
-        enable_cross_platform = data.get('enable_cross_platform', True)
-
         manager = SimulationManager()
         state = manager.get_simulation(simulation_id)
 
@@ -989,53 +1013,29 @@ async def start_simulation(data: dict = Body(...)):
             raise HTTPException(status_code=404, detail=f"Simulation not found: {simulation_id}")
 
         force_restarted = False
-        
         if state.status != SimulationStatus.READY:
-            is_prepared, prepare_info = _check_simulation_prepared(simulation_id)
+            is_prepared, _ = _check_simulation_prepared(simulation_id)
 
             if is_prepared:
                 if state.status == SimulationStatus.RUNNING:
                     run_state = SimulationRunner.get_run_state(simulation_id)
                     if run_state and run_state.runner_status.value == "running":
                         if force:
-                            logger.info(f"Force mode: stopping running simulation {simulation_id}")
-                            try:
-                                SimulationRunner.stop_simulation(simulation_id)
-                            except Exception as e:
-                                logger.warning(f"Warning while stopping simulation: {str(e)}")
+                            SimulationRunner.stop_simulation(simulation_id)
                         else:
-                            raise HTTPException(status_code=400, detail="Simulation is running, please call /stop endpoint to stop first, or use force=true to force restart")
+                            raise HTTPException(status_code=400, detail="Simulation is running, call /stop first")
 
                 if force and not resume:
-                    logger.info(f"Force mode: cleaning simulation logs {simulation_id}")
-                    cleanup_result = SimulationRunner.cleanup_simulation_logs(simulation_id)
-                    if not cleanup_result.get("success"):
-                        logger.warning(f"Warning while cleaning logs: {cleanup_result.get('errors')}")
+                    SimulationRunner.cleanup_simulation_logs(simulation_id)
                     force_restarted = True
 
-                logger.info(f"Simulation {simulation_id} preparation complete, reset status to ready")
                 state.status = SimulationStatus.READY
                 manager._save_simulation_state(state)
             else:
-                raise HTTPException(status_code=400, detail=f"Simulation not ready, current status: {state.status.value}")
+                raise HTTPException(status_code=400, detail=f"Simulation not ready: {state.status.value}")
         
-        graph_id = None
-        if enable_graph_memory_update:
-            graph_id = state.graph_id
-            if not graph_id:
-                project = ProjectManager.get_project(state.project_id)
-                if project:
-                    graph_id = project.graph_id
-            
-            if not graph_id:
-                raise HTTPException(status_code=400, detail="Enabling graph memory update requires a valid graph_id")
-            
-            logger.info(f"Enable graph memory update: simulation_id={simulation_id}, graph_id={graph_id}")
-        
-        sim_storage = None
-        if enable_graph_memory_update:
-            from app.api import get_neo4j_storage
-            sim_storage = get_neo4j_storage()
+        graph_id = state.graph_id if enable_graph_memory_update else None
+        sim_storage = request.app.state.neo4j_storage if enable_graph_memory_update else None
 
         run_state = SimulationRunner.start_simulation(
             simulation_id=simulation_id,
@@ -1051,36 +1051,21 @@ async def start_simulation(data: dict = Body(...)):
         state.status = SimulationStatus.RUNNING
         manager._save_simulation_state(state)
         
-        response_data = run_state.to_dict()
-        if max_rounds:
-            response_data['max_rounds_applied'] = max_rounds
-        response_data['graph_memory_update_enabled'] = enable_graph_memory_update
-        response_data['force_restarted'] = force_restarted
-        response_data['resumed'] = resume and start_round > 0
-        if start_round > 0:
-            response_data['resumed_from_round'] = start_round
-        if enable_graph_memory_update:
-            response_data['graph_id'] = graph_id
-        
-        return SuccessResponse(success=True, data=response_data)
+        return SuccessResponse(success=True, data=run_state.to_dict())
         
     except HTTPException: raise
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error(f"Failed to start simulation: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @simulation_router.post('/stop', response_model=SuccessResponse)
-async def stop_simulation(data: dict = Body(...)):
+async def stop_simulation(payload: StopSimulationRequest):
     """
     Stop simulation
     """
     try:
-        simulation_id = data.get('simulation_id')
-        if not simulation_id:
-            raise HTTPException(status_code=400, detail="Please provide simulation_id")
+        simulation_id = payload.simulation_id
         
         run_state = SimulationRunner.stop_simulation(simulation_id)
         
@@ -1093,8 +1078,6 @@ async def stop_simulation(data: dict = Body(...)):
         return SuccessResponse(success=True, data=run_state.to_dict())
         
     except HTTPException: raise
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error(f"Failed to stop simulation: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))

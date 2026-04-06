@@ -12,6 +12,7 @@ from fastapi import Request, HTTPException, Body, Query, Path, BackgroundTasks
 from fastapi.responses import FileResponse, StreamingResponse
 
 from . import report_router
+from ..schemas import SuccessResponse, GenerateReportRequest, GenerateStatusRequest, ReportChatRequest
 from ..config import Config
 from ..services.report_agent import ReportAgent, ReportManager, ReportStatus
 from ..services.graph_tools import GraphToolsService
@@ -25,17 +26,14 @@ logger = get_logger('rustymirosquid.api.report')
 
 # ============== Report Generation Endpoints ==============
 
-@report_router.post('/generate')
-async def generate_report(request: Request, background_tasks: BackgroundTasks, payload: Dict[str, Any] = Body(...)):
+@report_router.post('/generate', response_model=SuccessResponse)
+async def generate_report(request: Request, background_tasks: BackgroundTasks, payload: GenerateReportRequest):
     """
     Generate simulation analysis report (async task)
     """
     try:
-        simulation_id = payload.get('simulation_id')
-        if not simulation_id:
-            raise HTTPException(status_code=400, detail="Please provide simulation_id")
-
-        force_regenerate = payload.get('force_regenerate', False)
+        simulation_id = payload.simulation_id
+        force_regenerate = payload.force_regenerate
 
         # Get simulation info
         manager = SimulationManager()
@@ -165,14 +163,14 @@ async def generate_report(request: Request, background_tasks: BackgroundTasks, p
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@report_router.post('/generate/status')
-async def get_generate_status(payload: Dict[str, Any] = Body(...)):
+@report_router.post('/generate/status', response_model=SuccessResponse)
+async def get_generate_status(payload: GenerateStatusRequest):
     """
     Query report generation task progress
     """
     try:
-        task_id = payload.get('task_id')
-        simulation_id = payload.get('simulation_id')
+        task_id = payload.task_id
+        simulation_id = payload.simulation_id
 
         # If simulation_id is provided, first check if a completed report exists
         if simulation_id:
@@ -213,46 +211,24 @@ async def get_generate_status(payload: Dict[str, Any] = Body(...)):
 
 # ============== Report Retrieval Endpoints ==============
 
-@report_bp.route('/<report_id>', methods=['GET'])
-def get_report(report_id: str):
+@report_router.get('/{report_id}', response_model=SuccessResponse)
+async def get_report(report_id: str):
     """
     Get report details
-
-    Returns:
-        {
-            "success": true,
-            "data": {
-                "report_id": "report_xxxx",
-                "simulation_id": "sim_xxxx",
-                "status": "completed",
-                "outline": {...},
-                "markdown_content": "...",
-                "created_at": "...",
-                "completed_at": "..."
-            }
-        }
     """
     try:
         report = ReportManager.get_report(report_id)
 
         if not report:
-            return jsonify({
-                "success": False,
-                "error": f"Report not found: {report_id}"
-            }), 404
+            raise HTTPException(status_code=404, detail=f"Report not found: {report_id}")
 
-        return jsonify({
-            "success": True,
-            "data": report.to_dict()
-        })
+        return SuccessResponse(success=True, data=report.to_dict())
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Failed to get report: {str(e)}")
-        return jsonify({
-            "success": False,
-            "error": str(e),
-            "traceback": traceback.format_exc()
-        }), 500
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @report_router.get('/by-simulation/{simulation_id}')
@@ -343,15 +319,15 @@ async def delete_report(report_id: str):
 
 # ============== Report Agent Chat Endpoints ==============
 
-@report_router.post('/chat')
-async def chat_with_report_agent(request: Request, payload: Dict[str, Any] = Body(...)):
+@report_router.post('/chat', response_model=SuccessResponse)
+async def chat_with_report_agent(request: Request, payload: ReportChatRequest):
     """
     Chat with Report Agent
     """
     try:
-        simulation_id = payload.get('simulation_id')
-        message = payload.get('message')
-        chat_history = payload.get('chat_history', [])
+        simulation_id = payload.simulation_id
+        message = payload.message
+        chat_history = payload.chat_history
 
         if not simulation_id:
             raise HTTPException(status_code=400, detail="Please provide simulation_id")
@@ -407,24 +383,10 @@ async def chat_with_report_agent(request: Request, payload: Dict[str, Any] = Bod
 
 # ============== Report Status Check Endpoints ==============
 
-@report_bp.route('/check/<simulation_id>', methods=['GET'])
-def check_report_status(simulation_id: str):
+@report_router.get('/check/{simulation_id}', response_model=SuccessResponse)
+async def check_report_status(simulation_id: str):
     """
     Check if a simulation has a report and its status
-
-    Used by frontend to determine whether to unlock Interview feature
-
-    Returns:
-        {
-            "success": true,
-            "data": {
-                "simulation_id": "sim_xxxx",
-                "has_report": true,
-                "report_status": "completed",
-                "report_id": "report_xxxx",
-                "interview_unlocked": true
-            }
-        }
     """
     try:
         report = ReportManager.get_report_by_simulation(simulation_id)
@@ -436,24 +398,17 @@ def check_report_status(simulation_id: str):
         # Only unlock interview after report is completed
         interview_unlocked = has_report and report.status == ReportStatus.COMPLETED
 
-        return jsonify({
-            "success": True,
-            "data": {
-                "simulation_id": simulation_id,
-                "has_report": has_report,
-                "report_status": report_status,
-                "report_id": report_id,
-                "interview_unlocked": interview_unlocked
-            }
+        return SuccessResponse(success=True, data={
+            "simulation_id": simulation_id,
+            "has_report": has_report,
+            "report_status": report_status,
+            "report_id": report_id,
+            "interview_unlocked": interview_unlocked
         })
 
     except Exception as e:
         logger.error(f"Failed to check report status: {str(e)}")
-        return jsonify({
-            "success": False,
-            "error": str(e),
-            "traceback": traceback.format_exc()
-        }), 500
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ============== Agent Log Endpoints ==============
