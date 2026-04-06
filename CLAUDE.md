@@ -160,7 +160,7 @@ cd frontend && bun run dev
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **RustyMiroSquid** (2282 symbols, 10419 relationships, 190 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **RustyMiroSquid** (2342 symbols, 10730 relationships, 194 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
 
@@ -233,7 +233,8 @@ Before completing any code modification task, verify:
 After committing code changes, the GitNexus index becomes stale. Re-run analyze to update it:
 
 ```bash
-bunx gitnexus analyze```
+npx gitnexus analyze
+```
 
 If the index previously included embeddings, preserve them by adding `--embeddings`:
 
