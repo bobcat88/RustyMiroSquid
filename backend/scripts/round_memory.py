@@ -312,7 +312,7 @@ class RoundMemory:
 
         # Run LLM compaction in background thread (non-blocking)
         full_text = rec.full_text()
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         loop.run_in_executor(self._pool, self._compact_sync, rec, full_text)
 
         # Also check if we should batch-compact ancient rounds

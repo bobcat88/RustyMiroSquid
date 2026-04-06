@@ -280,7 +280,7 @@ def phase5_config(document_text, ontology, profiles):
 
 def main():
     print(f"\n{'#'*60}")
-    print(f"  MiroShark Full Pipeline Test")
+    print(f"  RustyMiroSquid Full Pipeline Test")
     print(f"  PDF: {os.path.basename(PDF_PATH)}")
     print(f"  Requirement: {SIMULATION_REQUIREMENT[:80]}...")
     print(f"  Model: {Config.LLM_MODEL_NAME}")

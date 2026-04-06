@@ -19,7 +19,7 @@ import sqlite3
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
-logger = logging.getLogger('miroshark.bridge')
+logger = logging.getLogger('rustymirosquid.bridge')
 
 
 @dataclass

@@ -1,7 +1,7 @@
 # README-RustyMiroSquid-v1.md
 
 ## Contexte & Finalité
-**RustyMiroSquid** (basé sur MiroShark) est un moteur d'intelligence en essaim universel. Il permet de simuler des réactions sociales à partir de n'importe quel document source (communiqués de presse, rapports financiers, etc.) en générant des centaines d'agents IA aux personnalités uniques.
+**RustyMiroSquid** (basé sur RustyMiroSquid) est un moteur d'intelligence en essaim universel. Il permet de simuler des réactions sociales à partir de n'importe quel document source (communiqués de presse, rapports financiers, etc.) en générant des centaines d'agents IA aux personnalités uniques.
 
 Le projet a été forké pour intégrer des optimisations de performance (Neo4j, No-GIL Python) et une infrastructure compatible avec le standard **PROUST**.
 

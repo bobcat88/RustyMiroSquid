@@ -25,7 +25,10 @@ class Position:
     avg_price: float
     unrealized_pnl: float = 0.0
 
-class Broker(ABC):
+class BaseBroker(ABC):
+    def __init__(self, fiscal_service: Optional[FiscalService] = None):
+        self.fiscal_service = fiscal_service or FiscalService
+
     @abstractmethod
     async def get_balance(self) -> float:
         """Returns the current cash balance."""
@@ -49,12 +52,13 @@ class Broker(ABC):
     async def get_positions(self) -> List[Position]:
         return []
 
-class LocalBroker(Broker):
+class LocalBroker(BaseBroker):
     """
     A local trading platform simulator for backtesting.
     Does not use real capital.
     """
-    def __init__(self, initial_balance: float = 100000.0):
+    def __init__(self, initial_balance: float = 100000.0, fiscal_service: Optional[FiscalService] = None):
+        super().__init__(fiscal_service)
         self.balance = initial_balance
         self.positions: Dict[str, Position] = {}
         self.trades: List[Trade] = []
@@ -73,9 +77,9 @@ class LocalBroker(Broker):
         """Calculates equity net of estimated taxes on unrealized profits."""
         total_unrealized_pnl = sum(p.unrealized_pnl for p in self.positions.values())
         
-        if FiscalService and total_unrealized_pnl > 0:
+        if self.fiscal_service and total_unrealized_pnl > 0:
             # Estimate tax on unrealized profit as if we sold everything now
-            net_profit = FiscalService.calculate_net_profit(total_unrealized_pnl, domicile)
+            net_profit = self.fiscal_service.calculate_net_profit(total_unrealized_pnl, domicile)
             tax_liability = total_unrealized_pnl - net_profit
             return self.equity - tax_liability
             

@@ -22,7 +22,7 @@ from .entity_reader import EntityNode
 from .web_enrichment import WebEnricher
 from ..storage import GraphStorage
 
-logger = get_logger('miroshark.oasis_profile')
+logger = get_logger('rustymirosquid.oasis_profile')
 
 
 @dataclass

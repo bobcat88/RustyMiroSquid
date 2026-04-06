@@ -26,7 +26,7 @@ from .ner_extractor import NERExtractor
 from .search_service import SearchService
 from . import neo4j_schema
 
-logger = logging.getLogger('miroshark.neo4j_storage')
+logger = logging.getLogger('rustymirosquid.neo4j_storage')
 
 
 class Neo4jStorage(GraphStorage):

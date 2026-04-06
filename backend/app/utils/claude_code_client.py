@@ -15,7 +15,7 @@ from typing import Optional, Dict, Any, List
 
 from .logger import get_logger
 
-logger = get_logger('miroshark.claude_code_client')
+logger = get_logger('rustymirosquid.claude_code_client')
 
 
 class ClaudeCodeClient:

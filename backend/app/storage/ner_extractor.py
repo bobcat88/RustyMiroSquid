@@ -11,7 +11,7 @@ from typing import Dict, Any, List, Optional
 
 from ..utils.llm_client import LLMClient, create_llm_client
 
-logger = logging.getLogger('miroshark.ner_extractor')
+logger = logging.getLogger('rustymirosquid.ner_extractor')
 
 # System prompt template for NER/RE extraction
 _SYSTEM_PROMPT = """You are a Named Entity Recognition and Relation Extraction system.

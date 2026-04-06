@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-End-to-end API test — exercises the full MiroShark pipeline via HTTP.
+End-to-end API test — exercises the full RustyMiroSquid pipeline via HTTP.
 
 Usage:
     1. Start Neo4j:   docker compose up neo4j -d
@@ -437,7 +437,7 @@ def phase7_retrieve_report(report_id):
 
 def main():
     print(f"\n{Colors.BOLD}{'#'*60}")
-    print(f"  MiroShark — End-to-End API Test")
+    print(f"  RustyMiroSquid — End-to-End API Test")
     print(f"  API: {BASE_URL}")
     print(f"  PDF: {os.path.basename(PDF_PATH)}")
     print(f"  Rounds: {MAX_SIM_ROUNDS}")

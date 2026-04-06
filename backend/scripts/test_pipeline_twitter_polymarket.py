@@ -311,7 +311,7 @@ def analyze_results():
 
 def main():
     print(f"\n{'#'*60}")
-    print(f"  MiroShark — Full 3-Platform Simulation Test")
+    print(f"  RustyMiroSquid — Full 3-Platform Simulation Test")
     print(f"  Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"{'#'*60}")
 

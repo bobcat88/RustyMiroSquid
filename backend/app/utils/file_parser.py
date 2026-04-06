@@ -33,29 +33,16 @@ def _read_text_with_fallback(file_path: str) -> str:
         pass
     
     # Try using charset_normalizer to detect encoding
-    encoding = None
     try:
         from charset_normalizer import from_bytes
         best = from_bytes(data).best()
         if best and best.encoding:
-            encoding = best.encoding
+            return data.decode(best.encoding, errors='replace')
     except Exception:
         pass
     
-    # Fall back to chardet
-    if not encoding:
-        try:
-            import chardet
-            result = chardet.detect(data)
-            encoding = result.get('encoding') if result else None
-        except Exception:
-            pass
-    
     # Final fallback: use UTF-8 + replace
-    if not encoding:
-        encoding = 'utf-8'
-    
-    return data.decode(encoding, errors='replace')
+    return data.decode('utf-8', errors='replace')
 
 
 class FileParser:

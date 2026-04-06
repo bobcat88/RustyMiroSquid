@@ -7,7 +7,7 @@ import os
 from dotenv import load_dotenv
 
 # Load the .env file from the project root directory
-# Path: MiroShark/.env (relative to backend/app/config.py)
+# Path: RustyMiroSquid/.env (relative to backend/app/config.py)
 project_root_env = os.path.join(os.path.dirname(__file__), '../../.env')
 
 if os.path.exists(project_root_env):
@@ -18,14 +18,11 @@ else:
 
 
 class Config:
-    """Flask configuration class"""
+    """FastAPI configuration class"""
 
-    # Flask configuration
-    SECRET_KEY = os.environ.get('SECRET_KEY', 'miroshark-secret-key')
-    DEBUG = os.environ.get('FLASK_DEBUG', 'True').lower() == 'true'
-    
-    # JSON configuration - disable ASCII escaping, display non-ASCII characters directly (instead of \uXXXX format)
-    JSON_AS_ASCII = False
+    # Application configuration
+    SECRET_KEY = os.environ.get('SECRET_KEY', 'rustymirosquid-secret-key')
+    DEBUG = os.environ.get('DEBUG', 'True').lower() == 'true'
     
     # LLM configuration (unified OpenAI format)
     # LLM_PROVIDER: "openai" (default, any OpenAI-compatible API) or "claude-code" (local CLI)
@@ -45,7 +42,7 @@ class Config:
     # Neo4j configuration
     NEO4J_URI = os.environ.get('NEO4J_URI', 'bolt://localhost:7687')
     NEO4J_USER = os.environ.get('NEO4J_USER', 'neo4j')
-    NEO4J_PASSWORD = os.environ.get('NEO4J_PASSWORD', 'miroshark')
+    NEO4J_PASSWORD = os.environ.get('NEO4J_PASSWORD', 'rustymirosquid')
 
     # Embedding configuration
     # EMBEDDING_PROVIDER: "ollama" (default) uses /api/embed, "openai" uses /v1/embeddings

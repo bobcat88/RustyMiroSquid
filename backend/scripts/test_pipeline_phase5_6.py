@@ -310,7 +310,7 @@ def phase6_simulation(config, storage, graph_id):
 
 def main():
     print(f"\n{'#'*60}")
-    print(f"  MiroShark Pipeline Test — Phases 5-6")
+    print(f"  RustyMiroSquid Pipeline Test — Phases 5-6")
     print(f"  Model: {Config.LLM_MODEL_NAME}")
     print(f"  Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"{'#'*60}")

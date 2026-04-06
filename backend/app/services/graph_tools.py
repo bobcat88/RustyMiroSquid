@@ -20,7 +20,7 @@ from ..utils.logger import get_logger
 from ..utils.llm_client import LLMClient, create_smart_llm_client
 from ..storage import GraphStorage
 
-logger = get_logger('miroshark.graph_tools')
+logger = get_logger('rustymirosquid.graph_tools')
 
 
 @dataclass

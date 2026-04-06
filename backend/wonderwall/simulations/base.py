@@ -318,7 +318,7 @@ class BaseAction(ABC):
             if name in self._excluded_methods:
                 continue
             method = getattr(self, name)
-            if asyncio.iscoroutinefunction(method):
+            if inspect.iscoroutinefunction(method):
                 tools.append(FunctionTool(method))
         return tools
 

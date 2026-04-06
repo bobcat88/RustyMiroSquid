@@ -1,4 +1,4 @@
-# CLAUDE.md — RustyMiroSquid (MiroShark)
+# CLAUDE.md — RustyMiroSquid (RustyMiroSquid)
 *Contexte d'initialisation — Lire en premier avant toute action.*
 *Version : 1.0 — 2026-04-05 | Auteur : Johan PROUST*
 
@@ -20,7 +20,7 @@ Fork de [`github.com/aaronjmars/MiroShark`](https://github.com/aaronjmars/MiroSh
 
 ```
 RustyMiroSquid/
-├── frontend/          ← Vue 3 + Vite + D3.js + Vue Router (npm — voir ⚠️)
+├── frontend/          ← Vue 3 + Vite + D3.js + Vue Router (bun — voir ⚠️)
 ├── backend/           ← Flask + Python + uv (pyproject.toml)
 │   └── app/
 │       ├── api/           ← graph, simulation, report, templates
@@ -28,14 +28,14 @@ RustyMiroSquid/
 │       ├── services/      ← logique métier (voir liste complète)
 │       ├── storage/       ← embedding_service, graph_storage, neo4j_schema
 │       └── preset_templates/ ← JSON templates (campus, crypto, political...)
-├── docker-compose.yml ← Neo4j + Ollama + miroshark (image ghcr.io)
+├── docker-compose.yml ← Neo4j + Ollama + rustymirosquid (image ghcr.io)
 ├── package.json       ← root scripts (concurrently backend+frontend)
 └── .env.example
 ```
 
 **Stack :**
-- Frontend : Vue 3.5 + Vite 7 + D3.js + Axios + Vue Router
-- Backend : Flask 3 (should FastAPI) + Python 3.11+ + uv + pydantic v2
+- Frontend : Vue 3.5 + Vite 7 + D3.js + Tailwind v4 (migration en cours) + Motion + Lucide
+- Backend : Flask 3 (pivot vers FastAPI v2 imminent) + Python 3.12+ + uv + pydantic v2
 - Graph DB : Neo4j 5.15
 - LLM : Ollama (local) ou OpenAI-compatible API
 - AI agents : camel-ai 0.2.78 + sentence-transformers + torch
@@ -49,7 +49,7 @@ RustyMiroSquid/
 0be442c  feat: trading agent framework — fiscal FR, SMC strategies, market-media bridge
 9cf7fbd  feat: OVTLYR trading policy — multi-strategy agent simulations
 980b317  chore: PROUST standard documentation v1
---- (commits upstream MiroShark en dessous)
+--- (commits upstream RustyMiroSquid en dessous)
 ```
 
 **Antigravity a ajouté :**
@@ -60,7 +60,7 @@ RustyMiroSquid/
 - `graph_memory_updater.py` — mise à jour mémoire graphe
 - Documentation PROUST standard (README, CLAUDE.md initial, etc.)
 
-Ce sont des extensions **non présentes dans le MiroShark upstream** — à ne pas écraser si on resync avec l'upstream.
+Ce sont des extensions **non présentes dans le RustyMiroSquid upstream** — à ne pas écraser si on resync avec l'upstream.
 
 ---
 
@@ -91,16 +91,12 @@ cd frontend && bun install
 ```
 Puis adapter les scripts dans `package.json` (voir tableau npm→bun dans AI-Bonanza README).
 
-### 3. Docker image vs code local (IMPORTANT)
-`docker-compose.yml` utilise l'image upstream : `ghcr.io/aaronjmars/miroshark:latest`
-Cette image **ne contient pas** les additions Antigravity (trading, fiscal, OVTLYR).
-
-Pour développement local : **ne pas utiliser docker pour miroshark**, uniquement pour Neo4j + Ollama :
+Pour développement local : **ne pas utiliser docker pour rustymirosquid**, uniquement pour Neo4j + Ollama :
 ```bash
 # Lancer seulement Neo4j + Ollama via docker
 docker compose up neo4j ollama -d
-# Lancer miroshark en local
-bun run dev  # ou npm run dev
+# Lancer rustymirosquid en local
+bun run dev
 ```
 
 ### 4. LLM Model — qwen2.5:32b → qwen3:32b
@@ -110,7 +106,7 @@ Qwen3 est supérieur à taille égale. Migration simple :
 # docker-compose.yml
 - LLM_MODEL_NAME=qwen3:32b
 ```
-Puis : `docker exec miroshark-ollama ollama pull qwen3:32b`
+Puis : `docker exec rustymirosquid-ollama ollama pull qwen3:32b`
 
 ### 5. camel-ai version lock
 `camel-ai==0.2.78` est pincé. Le framework trading d'Antigravity l'utilise — ne pas upgrader sans tester.
@@ -142,8 +138,8 @@ cd frontend && bun run dev
 ## Outillage — Règles globales Johan
 
 - **Python :** `uv` > `pip` (déjà en place ✅)
-- **Node :** `bun` > `npm` (migration à faire)
-- **Linting :** Biome (`bun add -D @biomejs/biome`)
+- **Node :** `bun` > `npm` (déjà en place ✅)
+- **Linting :** Biome (remplace ESLint + Prettier — Rust, 10-100× plus rapide) ✅
 
 ---
 
@@ -161,21 +157,10 @@ cd frontend && bun run dev
 
 ---
 
-## Roadmap / Chantiers identifiés
-
-| Priorité | Tâche | Impact |
-|----------|-------|--------|
-| P0 | Vérifier compatibilité Python 3.12 (torch/camel-ai) | Stabilité |
-| P1 | Migrer npm → bun (frontend + root) | Performance |
-| P1 | Docker : séparer miroshark (local) de Neo4j+Ollama | Dev workflow |
-| P2 | LLM model : qwen2.5:32b → qwen3:32b | Qualité outputs |
-| P3 | Frontend : évaluer shadcn-vue + Tailwind v4 | UI upgrade |
-| P3 | Évaluer Polars pour remplacer pandas dans pipeline | Performance data |
-
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **RustyMiroSquid** (2271 symbols, 10378 relationships, 189 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **RustyMiroSquid** (2282 symbols, 10419 relationships, 190 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
 
@@ -248,8 +233,7 @@ Before completing any code modification task, verify:
 After committing code changes, the GitNexus index becomes stale. Re-run analyze to update it:
 
 ```bash
-npx gitnexus analyze
-```
+bunx gitnexus analyze```
 
 If the index previously included embeddings, preserve them by adding `--embeddings`:
 

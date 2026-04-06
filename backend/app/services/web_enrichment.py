@@ -35,7 +35,7 @@ from ..config import Config
 from ..utils.llm_client import create_llm_client, LLMClient
 from ..utils.logger import get_logger
 
-logger = get_logger("miroshark.web_enrichment")
+logger = get_logger("rustymirosquid.web_enrichment")
 
 
 # Entity types that are likely to be real-world figures worth searching

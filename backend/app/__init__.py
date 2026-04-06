@@ -1,5 +1,5 @@
 """
-MiroShark Backend - Flask application factory
+RustyMiroSquid Backend - FastAPI application factory
 """
 
 import os
@@ -9,85 +9,61 @@ import warnings
 # Must be set before all other imports
 warnings.filterwarnings("ignore", message=".*resource_tracker.*")
 
-from flask import Flask, request
-from flask_cors import CORS
-
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from .config import Config
 from .utils.logger import setup_logger, get_logger
 
-
 def create_app(config_class=Config):
-    """Flask application factory function"""
-    app = Flask(__name__)
-    app.config.from_object(config_class)
-    
-    # Set JSON encoding: ensure non-ASCII characters are displayed directly (instead of \uXXXX format)
-    # Flask >= 2.3 uses app.json.ensure_ascii, older versions use JSON_AS_ASCII config
-    if hasattr(app, 'json') and hasattr(app.json, 'ensure_ascii'):
-        app.json.ensure_ascii = False
+    """FastAPI application factory function"""
+    app = FastAPI(
+        title="RustyMiroSquid API",
+        description="Simple and Universal Swarm Intelligence Engine",
+        version="0.1.0"
+    )
     
     # Set up logging
-    logger = setup_logger('miroshark')
-    
-    # Only print startup info in the reloader subprocess (avoid printing twice in debug mode)
-    is_reloader_process = os.environ.get('WERKZEUG_RUN_MAIN') == 'true'
-    debug_mode = app.config.get('DEBUG', False)
-    should_log_startup = not debug_mode or is_reloader_process
-    
-    if should_log_startup:
-        logger.info("=" * 50)
-        logger.info("MiroShark Backend starting...")
-        logger.info("=" * 50)
+    logger = setup_logger('rustymirosquid')
+    logger.info("=" * 50)
+    logger.info("RustyMiroSquid Backend (FastAPI) starting...")
+    logger.info("=" * 50)
     
     # Enable CORS
-    CORS(app, resources={r"/api/*": {"origins": "*"}})
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
-    # --- Initialize Neo4jStorage singleton (DI via app.extensions) ---
+    # --- Initialize Neo4jStorage singleton ---
     from .storage import Neo4jStorage
     try:
         neo4j_storage = Neo4jStorage()
-        app.extensions['neo4j_storage'] = neo4j_storage
-        if should_log_startup:
-            logger.info("Neo4jStorage initialized (connected to %s)", Config.NEO4J_URI)
+        app.state.neo4j_storage = neo4j_storage
+        logger.info("Neo4jStorage initialized (connected to %s)", Config.NEO4J_URI)
     except Exception as e:
         logger.error("Neo4jStorage initialization failed: %s", e)
-        # Store None so endpoints can return 503 gracefully
-        app.extensions['neo4j_storage'] = None
+        app.state.neo4j_storage = None
 
-    # Register simulation process cleanup function (ensure all simulation processes are terminated when server shuts down)
+    # Register simulation process cleanup
     from .services.simulation_runner import SimulationRunner
     SimulationRunner.register_cleanup()
-    if should_log_startup:
-        logger.info("Simulation process cleanup function registered")
+    logger.info("Simulation process cleanup function registered")
     
-    # Request logging middleware
-    @app.before_request
-    def log_request():
-        logger = get_logger('miroshark.request')
-        logger.debug(f"Request: {request.method} {request.path}")
-        if request.content_type and 'json' in request.content_type:
-            logger.debug(f"Request body: {request.get_json(silent=True)}")
-    
-    @app.after_request
-    def log_response(response):
-        logger = get_logger('miroshark.request')
-        logger.debug(f"Response: {response.status_code}")
-        return response
-    
-    # Register blueprints
-    from .api import graph_bp, simulation_bp, report_bp, templates_bp
-    app.register_blueprint(graph_bp, url_prefix='/api/graph')
-    app.register_blueprint(simulation_bp, url_prefix='/api/simulation')
-    app.register_blueprint(report_bp, url_prefix='/api/report')
-    app.register_blueprint(templates_bp, url_prefix='/api/templates')
+    # Register routers
+    from .api import graph_router, simulation_router, report_router, templates_router
+    app.include_router(graph_router, prefix='/api/graph', tags=['Graph'])
+    app.include_router(simulation_router, prefix='/api/simulation', tags=['Simulation'])
+    app.include_router(report_router, prefix='/api/report', tags=['Report'])
+    app.include_router(templates_router, prefix='/api/templates', tags=['Templates'])
     
     # Health check
-    @app.route('/health')
-    def health():
-        return {'status': 'ok', 'service': 'MiroShark Backend'}
+    @app.get('/health')
+    async def health():
+        return {'status': 'ok', 'service': 'RustyMiroSquid Backend'}
     
-    if should_log_startup:
-        logger.info("MiroShark Backend startup complete")
-    
+    logger.info("RustyMiroSquid Backend startup complete")
     return app
 

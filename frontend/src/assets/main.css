@@ -1,0 +1,95 @@
+@import "tailwindcss";
+
+@theme {
+  /* ── Colors ── */
+  --color-orange: #FF6B1A;
+  --color-green: #43C165;
+  --color-white: #FAFAFA;
+  --color-black: #0A0A0A;
+  --color-gray: #F5F5F5;
+  --color-amber: #FFB347;
+  --color-red: #FF4444;
+
+  /* ── Modular Spacing Scale ── */
+  --spacing-xs: 6px;
+  --spacing-sm: 11px;
+  --spacing-md: 22px;
+  --spacing-lg: 34px;
+  --spacing-xl: 56px;
+  --spacing-2xl: 84px;
+
+  /* ── Fonts ── */
+  --font-display: "Young Serif", Georgia, serif;
+  --font-mono: "Space Mono", "Courier New", monospace;
+
+  /* ── Animations ── */
+  @keyframes fade-in {
+    from { opacity: 0; transform: translateY(14px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes shimmer {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 1; }
+  }
+  @keyframes pulse-border {
+    0%, 100% { border-color: var(--color-orange); }
+    50% { border-color: var(--color-green); }
+  }
+
+  --animate-fade-in: fade-in 0.5s ease-out;
+  --animate-shimmer: shimmer 2s ease-in-out infinite;
+  --animate-pulse-border: pulse-border 2s ease-in-out infinite;
+}
+
+/* ── Global Base ── */
+@layer base {
+  :root {
+    --background: #FAFAFA;
+    --foreground: #0A0A0A;
+  }
+
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  body, #app {
+    font-family: var(--font-display);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    color: var(--foreground);
+    background-color: var(--background);
+  }
+
+  button {
+    font-family: var(--font-mono);
+    cursor: pointer;
+  }
+
+  ::selection {
+    background: var(--color-orange);
+    color: var(--color-white);
+  }
+}
+
+/* ── Custom Utilities ── */
+@layer utilities {
+  .warning-stripes {
+    height: 7px;
+    background: repeating-linear-gradient(
+      -45deg,
+      var(--color-orange),
+      var(--color-orange) 11px,
+      var(--color-white) 11px,
+      var(--color-white) 22px
+    );
+  }
+
+  .bg-grid {
+    background-image:
+      linear-gradient(rgba(67,193,101,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(67,193,101,0.04) 1px, transparent 1px);
+    background-size: 70px 70px;
+  }
+}

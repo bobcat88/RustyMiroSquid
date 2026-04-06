@@ -1,18 +1,19 @@
 {
-  "name": "miroshark",
+  "name": "rustymirosquid",
   "version": "0.1.0",
-  "description": "MiroShark - A concise and versatile swarm intelligence engine for predicting everything",
+  "description": "RustyMiroSquid - A concise and versatile swarm intelligence engine for predicting everything",
   "scripts": {
-    "setup": "npm install && cd frontend && npm install",
+    "setup": "bun install && cd frontend && bun install",
     "setup:backend": "cd backend && uv sync",
-    "setup:all": "npm run setup && npm run setup:backend",
+    "setup:all": "bun run setup && bun run setup:backend",
     "predev": "node -e \"const{execSync:e}=require('child_process');[3000,5001].forEach(p=>{try{const o=e('lsof -ti:'+p,{encoding:'utf8'}).trim();if(o){e('kill -9 '+o);console.log('Killed stale process on port '+p)}}catch{}})\"",
-    "dev": "concurrently -n \"backend,frontend\" -c \"green,cyan\" \"npm run backend\" \"npm run frontend\"",
+    "dev": "concurrently -n \"backend,frontend\" -c \"green,cyan\" \"bun run backend\" \"bun run frontend\"",
     "backend": "cd backend && uv run python run.py",
-    "frontend": "cd frontend && npm run dev -- --host",
-    "build": "cd frontend && npm run build"
+    "frontend": "cd frontend && bun run dev -- --host",
+    "build": "cd frontend && bun run build"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.4.10",
     "concurrently": "^9.1.2"
   },
   "engines": {

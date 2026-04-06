@@ -1,24 +1,29 @@
-FROM python:3.11
+FROM python:3.12-slim
 
-# Install Node.js (>= 18) and necessary tools
-RUN apt-get update \
-  && apt-get install -y --no-install-recommends nodejs npm \
-  && rm -rf /var/lib/apt/lists/*
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    unzip \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Bun
+RUN curl -fsSL https://bun.sh/install | bash
+ENV PATH="/root/.bun/bin:${PATH}"
 
 # Copy uv from the official uv image
-COPY --from=ghcr.io/astral-sh/uv:0.9.26 /uv /uvx /bin/
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 WORKDIR /app
 
-# Copy dependency descriptor files first to leverage Docker cache
-COPY package.json package-lock.json ./
-COPY frontend/package.json frontend/package-lock.json ./frontend/
+# Copy dependency descriptor files first
+COPY package.json bun.lockb ./
+COPY frontend/package.json frontend/bun.lockb ./frontend/
 COPY backend/pyproject.toml backend/uv.lock ./backend/
 
-# Install dependencies (Node + Python)
-RUN npm ci \
-  && npm ci --prefix frontend \
-  && cd backend && uv sync --frozen
+# Install dependencies
+RUN bun install \
+    && cd frontend && bun install \
+    && cd ../backend && uv sync --frozen
 
 # Copy project source code
 COPY . .
@@ -26,4 +31,4 @@ COPY . .
 EXPOSE 3000 5001
 
 # Start both frontend and backend simultaneously (development mode)
-CMD ["npm", "run", "dev"]
+CMD ["bun", "run", "dev"]

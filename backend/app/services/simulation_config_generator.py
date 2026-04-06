@@ -23,7 +23,7 @@ from ..utils.llm_client import create_llm_client
 from ..utils.logger import get_logger
 from .entity_reader import EntityNode
 
-logger = get_logger('miroshark.simulation_config')
+logger = get_logger('rustymirosquid.simulation_config')
 
 # China timezone activity configuration (Beijing Time)
 CHINA_TIMEZONE_CONFIG = {

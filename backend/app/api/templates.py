@@ -4,12 +4,13 @@ Template API routes — serves preset simulation templates
 
 import os
 import json
-from flask import jsonify
+from fastapi import HTTPException
+from typing import List, Dict, Any
 
-from . import templates_bp
+from . import templates_router
 from ..utils.logger import get_logger
 
-logger = get_logger('miroshark.api.templates')
+logger = get_logger('rustymirosquid.api.templates')
 
 TEMPLATES_DIR = os.path.join(os.path.dirname(__file__), '..', 'preset_templates')
 
@@ -34,13 +35,10 @@ def _load_templates():
     return templates
 
 
-@templates_bp.route('/list', methods=['GET'])
-def list_templates():
+@templates_router.get('/list')
+async def list_templates():
     """
     List all available simulation templates.
-
-    Returns a summary of each template (without the full seed_document)
-    so the frontend can render a gallery.
     """
     try:
         templates = _load_templates()
@@ -60,50 +58,42 @@ def list_templates():
                 "tags": t.get("tags", []),
             })
 
-        return jsonify({
+        return {
             "success": True,
             "data": summaries,
             "count": len(summaries)
-        })
+        }
 
     except Exception as e:
         logger.error(f"Failed to list templates: {e}")
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
+        raise HTTPException(status_code=500, detail=str(e))
 
 
-@templates_bp.route('/<template_id>', methods=['GET'])
-def get_template(template_id: str):
+@templates_router.get('/{template_id}')
+async def get_template(template_id: str):
     """
-    Get a single template by ID, including the full seed_document and
-    simulation_requirement for use in the creation flow.
+    Get a single template by ID.
     """
     try:
-        filepath = os.path.realpath(os.path.join(TEMPLATES_DIR, f"{template_id}.json"))
-        if not filepath.startswith(os.path.realpath(TEMPLATES_DIR)):
-            return jsonify({
-                "success": False,
-                "error": "Invalid template ID"
-            }), 400
+        # Security check: ensure template_id is just a filename
+        safe_id = os.path.basename(template_id)
+        if safe_id != template_id:
+            raise HTTPException(status_code=400, detail="Invalid template ID")
+            
+        filepath = os.path.join(TEMPLATES_DIR, f"{template_id}.json")
         if not os.path.exists(filepath):
-            return jsonify({
-                "success": False,
-                "error": f"Template not found: {template_id}"
-            }), 404
+            raise HTTPException(status_code=404, detail=f"Template not found: {template_id}")
 
         with open(filepath, 'r', encoding='utf-8') as f:
             template = json.load(f)
 
-        return jsonify({
+        return {
             "success": True,
             "data": template
-        })
+        }
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Failed to get template {template_id}: {e}")
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
+        raise HTTPException(status_code=500, detail=str(e))

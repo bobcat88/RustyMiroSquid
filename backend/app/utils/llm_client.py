@@ -73,8 +73,8 @@ class LLMClient:
             base_url=self.base_url,
             timeout=timeout,
             default_headers={
-                'HTTP-Referer': 'https://github.com/aaronjmars/MiroShark',
-                'X-Title': 'MiroShark',
+                'HTTP-Referer': 'https://github.com/aaronjmars/RustyMiroSquid',
+                'X-Title': 'RustyMiroSquid',
                 'X-OpenRouter-Categories': 'roleplay',
             },
         )

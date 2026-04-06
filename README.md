@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="./docs/images/miroshark.jpg" alt="MiroShark" width="120" />
+  <img src="./docs/images/rustymirosquid.jpg" alt="RustyMiroSquid" width="120" />
 </p>
 
-<h1 align="center">MiroShark</h1>
+<h1 align="center">RustyMiroSquid</h1>
 
 <p align="center">
   <strong>Universal Swarm Intelligence Engine — Run Locally or with Any Cloud API</strong><br>
@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img src="./docs/images/miroshark.gif" alt="MiroShark Demo" />
+  <img src="./docs/images/rustymirosquid.gif" alt="RustyMiroSquid Demo" />
 </p>
 
 <p align="center">
@@ -122,7 +122,7 @@ Only Neo4j runs locally. LLM and embeddings use a cloud provider.
 # 1. Start Neo4j (or: brew install neo4j && brew services start neo4j)
 docker run -d --name neo4j \
   -p 7474:7474 -p 7687:7687 \
-  -e NEO4J_AUTH=neo4j/miroshark \
+  -e NEO4J_AUTH=neo4j/rustymirosquid \
   neo4j:5.15-community
 
 # 2. Configure
@@ -155,12 +155,12 @@ Open `http://localhost:3000` — backend API at `http://localhost:5001`.
 
 ```bash
 git clone https://github.com/aaronjmars/MiroShark.git
-cd MiroShark
+cd RustyMiroSquid
 docker compose up -d
 
 # Pull models into Ollama
-docker exec miroshark-ollama ollama pull qwen3.5:27b
-docker exec miroshark-ollama ollama pull nomic-embed-text
+docker exec rustymirosquid-ollama ollama pull qwen3.5:27b
+docker exec rustymirosquid-ollama ollama pull nomic-embed-text
 ```
 
 Open `http://localhost:3000`.
@@ -173,7 +173,7 @@ Open `http://localhost:3000`.
 # 1. Start Neo4j
 docker run -d --name neo4j \
   -p 7474:7474 -p 7687:7687 \
-  -e NEO4J_AUTH=neo4j/miroshark \
+  -e NEO4J_AUTH=neo4j/rustymirosquid \
   neo4j:5.15-community
 
 # 2. Start Ollama & pull models
@@ -203,7 +203,7 @@ claude
 # 3. Start Neo4j
 docker run -d --name neo4j \
   -p 7474:7474 -p 7687:7687 \
-  -e NEO4J_AUTH=neo4j/miroshark \
+  -e NEO4J_AUTH=neo4j/rustymirosquid \
   neo4j:5.15-community
 
 # 4. Configure
@@ -224,7 +224,7 @@ You still need embeddings — use a cloud provider or local Ollama for those (Cl
 npm run setup:all && npm run dev
 ```
 
-> **What's covered:** When `LLM_PROVIDER=claude-code`, all MiroShark services route through Claude Code — graph building (ontology, NER), agent profile generation, simulation config, report generation, and persona chat. The only exception is the CAMEL-AI simulation engine itself, which requires an OpenAI-compatible API (Ollama or cloud) since it manages its own LLM connections internally.
+> **What's covered:** When `LLM_PROVIDER=claude-code`, all RustyMiroSquid services route through Claude Code — graph building (ontology, NER), agent profile generation, simulation config, report generation, and persona chat. The only exception is the CAMEL-AI simulation engine itself, which requires an OpenAI-compatible API (Ollama or cloud) since it manages its own LLM connections internally.
 
 | Component | Claude Code | Needs separate LLM |
 |---|---|---|
@@ -259,11 +259,11 @@ A typical simulation runs ~40 turns × 100+ agents. Pick a model that balances c
 
 #### Local (Ollama)
 
-> **Context override required.** Ollama defaults to 4096 tokens, but MiroShark prompts need 10–30k. Create a custom Modelfile:
+> **Context override required.** Ollama defaults to 4096 tokens, but RustyMiroSquid prompts need 10–30k. Create a custom Modelfile:
 >
 > ```bash
 > printf 'FROM qwen3:14b\nPARAMETER num_ctx 32768' > Modelfile
-> ollama create mirosharkai -f Modelfile
+> ollama create rustymirosquidai -f Modelfile
 > ```
 
 | Model | VRAM | Speed | Notes |
@@ -345,7 +345,7 @@ LLM_MODEL_NAME=qwen3.5:27b
 # Neo4j
 NEO4J_URI=bolt://localhost:7687
 NEO4J_USER=neo4j
-NEO4J_PASSWORD=miroshark
+NEO4J_PASSWORD=rustymirosquid
 
 # Embeddings
 EMBEDDING_PROVIDER=ollama          # "ollama" or "openai"

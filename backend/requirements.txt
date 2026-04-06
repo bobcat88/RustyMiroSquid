@@ -1,20 +1,21 @@
 # ===========================================
-# MiroShark Backend Dependencies
+# RustyMiroSquid Backend Dependencies (uv)
 # ===========================================
-# Python 3.11+ required
-# Install: pip install -r requirements.txt
+# Python 3.14 required (uv python pin 3.14)
+# Install: uv sync
 # ===========================================
 
 # ============= Core Framework =============
-flask>=3.0.0
-flask-cors>=6.0.0
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+python-multipart>=0.0.6
 
 # ============= LLM Related =============
 # OpenAI SDK (unified LLM calls using OpenAI format)
 openai>=1.0.0
 
 # ============= Neo4j =============
-neo4j>=5.15.0
+neo4j>=6.1.0
 
 # ============= HTTP Requests =============
 # For Ollama embedding API
@@ -23,7 +24,7 @@ requests>=2.31.0
 # ============= OASIS Social Media Simulation (Wonderwall fork) =============
 # Wonderwall (oasis package) is bundled directly in backend/oasis/
 # No separate install needed — camel-oasis is no longer a pip dependency
-camel-ai==0.2.78
+camel-ai==0.2.90
 
 # Wonderwall runtime dependencies (needed by recsys, agent_graph, agents_generator)
 numpy>=1.26.0
@@ -37,7 +38,6 @@ igraph>=0.11.0
 PyMuPDF>=1.24.0
 # Encoding detection (supports non-UTF-8 encoded text files)
 charset-normalizer>=3.0.0
-chardet>=5.0.0
 
 # ============= Trading API Integration =============
 alpaca-py>=0.30.0
@@ -48,7 +48,7 @@ ib_insync>=0.9.86
 python-dotenv>=1.0.0
 
 # Data validation
-pydantic>=2.0.0
+pydantic>=2.10.0
 # Data Retrieval & Triggers
 yfinance>=0.2.36
 feedparser>=6.0.10

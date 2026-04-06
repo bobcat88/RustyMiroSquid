@@ -1,5 +1,5 @@
 """
-URL fetching and text extraction utility for MiroShark document ingestion.
+URL fetching and text extraction utility for RustyMiroSquid document ingestion.
 Fetches a URL and extracts readable article text without extra dependencies.
 """
 
@@ -171,8 +171,8 @@ def fetch_url_text(url: str, timeout: int = 15) -> dict:
 
     headers = {
         'User-Agent': (
-            'Mozilla/5.0 (compatible; MiroShark/1.0; '
-            '+https://github.com/aaronjmars/MiroShark)'
+            'Mozilla/5.0 (compatible; RustyMiroSquid/1.0; '
+            '+https://github.com/aaronjmars/RustyMiroSquid)'
         ),
         'Accept': 'text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.5',

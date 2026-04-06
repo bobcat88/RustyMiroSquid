@@ -1,4 +1,14 @@
-# Patchnote-RustyMiroSquid-v1.md
+## [v1.7.0] — 2026-04-06
+
+### TECH
+- Migration vers **Python 3.14** validée (compatible avec `uv python pin 3.14`).
+- Audit complet de compatibilité : zéro warning en mode strict (`-W error::DeprecationWarning`).
+- Mise à jour de **camel-ai** (0.2.90), **neo4j** (6.1.0), **pytest** (9.0.2), **pytest-asyncio** (1.3.0).
+- Intégration des bridges **Alpaca** (Paper Trading) et **IBKR** (TWS/Gateway) via `alpaca-py` et `ib-insync`.
+- Migration complète de **npm** vers **bun** (racine + frontend) avec génération de `bun.lockb`.
+- Refactorisation du code asynchrone pour suivre les standards Python 3.14+ (`inspect` & `get_running_loop`).
+- Nouvelle architecture **BaseBroker** avec injection native du **FiscalService** (Tax-Aware Equity).
+- Suppression des overrides `tool.uv` dans `pyproject.toml`.
 
 ## [v1.6.0] — 2026-04-05
 
@@ -91,7 +101,7 @@
 - Mise en conformité de la documentation (4 fichiers standard).
 
 ### FUNCTION
-- Initialisation du moteur de simulation MiroShark.
+- Initialisation du moteur de simulation RustyMiroSquid.
 
 ### QoL
 - Structure de repository clarifiée.

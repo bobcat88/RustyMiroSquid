@@ -1,5 +1,5 @@
 """
-MiroShark Backend entry point
+RustyMiroSquid Backend entry point
 """
 
 import os
@@ -18,9 +18,8 @@ if sys.platform == 'win32':
 # Add project root directory to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from app import create_app
+import uvicorn
 from app.config import Config
-
 
 def main():
     """Main function"""
@@ -33,17 +32,20 @@ def main():
         print("\nPlease check the configuration in your .env file")
         sys.exit(1)
     
-    # Create application
-    app = create_app()
-    
     # Get runtime configuration
-    host = os.environ.get('FLASK_HOST', '0.0.0.0')
-    port = int(os.environ.get('FLASK_PORT', 5001))
+    host = os.environ.get('HOST', '0.0.0.0')
+    port = int(os.environ.get('PORT', 5001))
     debug = Config.DEBUG
     
-    # Start server
-    app.run(host=host, port=port, debug=debug, threaded=True)
-
+    # Start server with Uvicorn
+    uvicorn.run(
+        "app:create_app",
+        host=host, 
+        port=port, 
+        reload=debug,
+        factory=True,
+        log_level="debug" if debug else "info"
+    )
 
 if __name__ == '__main__':
     main()

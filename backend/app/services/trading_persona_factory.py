@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 from .oasis_profile_generator import OasisAgentProfile
 
-logger = logging.getLogger('miroshark.trading_persona')
+logger = logging.getLogger('rustymirosquid.trading_persona')
 
 @dataclass
 class TradingArchetype:

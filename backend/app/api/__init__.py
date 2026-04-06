@@ -2,12 +2,12 @@
 API Routes Module
 """
 
-from flask import Blueprint
+from fastapi import APIRouter
 
-graph_bp = Blueprint('graph', __name__)
-simulation_bp = Blueprint('simulation', __name__)
-report_bp = Blueprint('report', __name__)
-templates_bp = Blueprint('templates', __name__)
+graph_router = APIRouter()
+simulation_router = APIRouter()
+report_router = APIRouter()
+templates_router = APIRouter()
 
 from . import graph  # noqa: E402, F401
 from . import simulation  # noqa: E402, F401

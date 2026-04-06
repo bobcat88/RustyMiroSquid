@@ -1,9 +1,9 @@
 services:
   neo4j:
     image: neo4j:5.15-community
-    container_name: miroshark-neo4j
+    container_name: rustymirosquid-neo4j
     environment:
-      - NEO4J_AUTH=neo4j/miroshark
+      - NEO4J_AUTH=neo4j/rustymirosquid
     ports:
       - "7474:7474"
       - "7687:7687"
@@ -13,25 +13,23 @@ services:
 
   ollama:
     image: ollama/ollama:latest
-    container_name: miroshark-ollama
+    container_name: rustymirosquid-ollama
     ports:
       - "11434:11434"
     volumes:
       - ollama_data:/root/.ollama
     restart: unless-stopped
 
-  miroshark:
-    image: ghcr.io/aaronjmars/miroshark:latest
-    # Mirror image (replace the address above if pulling is slow)
-    # image: ghcr.nju.edu.cn/aaronjmars/miroshark:latest
-    container_name: miroshark
+  rustymirosquid:
+    build: .
+    container_name: rustymirosquid
     environment:
       - LLM_API_KEY=ollama
       - LLM_BASE_URL=http://ollama:11434/v1
       - LLM_MODEL_NAME=qwen2.5:32b
       - NEO4J_URI=bolt://neo4j:7687
       - NEO4J_USER=neo4j
-      - NEO4J_PASSWORD=miroshark
+      - NEO4J_PASSWORD=rustymirosquid
       - EMBEDDING_MODEL=nomic-embed-text
       - EMBEDDING_BASE_URL=http://ollama:11434
       - OPENAI_API_KEY=ollama

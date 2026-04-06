@@ -17,7 +17,7 @@ import requests
 
 from ..config import Config
 
-logger = logging.getLogger('miroshark.embedding')
+logger = logging.getLogger('rustymirosquid.embedding')
 
 
 class EmbeddingService:
