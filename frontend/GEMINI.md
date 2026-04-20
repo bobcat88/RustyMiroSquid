@@ -39,3 +39,12 @@ bun run build             # Build de production
 - [ ] WebSocket client pour le flux de prix en temps réel
 - [ ] Graphe de vélocité de sentiment (D3.js)
 - [ ] Dashboard d'investissement avec positions simulées
+
+<!-- BORG_KNOWLEDGE_WORKFLOW_START -->
+## Borg Knowledge Vault & AI Workflow
+
+- Shared memory lives in `/home/_johan/Documents/Borg`. Start with `300 Entities/Projects/Portfolio - Condensed Knowledge.md`, `400 Resources/Tech/AI Knowledge Map.md`, `000 OS / Meta/AI Collaboration Protocol.md`, and `300 Entities/People/Johan - Working Profile.md`.
+- For this frontend scope, also read root `GEMINI.md`, `AGENTS.md`, and the vault symlink `300 Entities/Projects/RustyMiroSquid`.
+- Keep UI decisions tied to the investment-simulation workflow; mirror durable dashboard/product decisions back into the vault.
+- Use Beads/kspec if present, GitNexus before symbol edits, RTK for noisy command output, and run `bun run build` or the smallest relevant frontend gate before finishing.
+<!-- BORG_KNOWLEDGE_WORKFLOW_END -->

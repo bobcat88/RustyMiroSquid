@@ -4,6 +4,21 @@ Ce fichier contient les prompts système prêts-à-l'emploi pour chaque agent de
 
 ---
 
+<!-- BORG_KNOWLEDGE_WORKFLOW_START -->
+## Borg Knowledge Vault & AI Workflow
+
+- Treat `/home/_johan/Documents/Borg` as the durable cross-project memory layer. Start with `300 Entities/Projects/Portfolio - Condensed Knowledge.md`, `400 Resources/Tech/AI Knowledge Map.md`, `000 OS / Meta/AI Collaboration Protocol.md`, and `300 Entities/People/Johan - Working Profile.md`.
+- Keep repo-local docs authoritative for implementation details, but mirror durable project knowledge back into the vault when it affects other projects or future agents.
+- Use local symlink entry points from the vault when navigating related repos, especially `300 Entities/Projects/RustyMiroSquid`, `300 Entities/Projects/BorgInvestor`, and `300 Entities/Projects/AI-Bonanza`.
+- If Beads is present, run `bd prime`, use `bd ready/show/update/close`, and do not create markdown TODOs for trackable work.
+- If kspec is present, update specs before tasks, give every automation task full context/todos/acceptance criteria, and let `kspec agent dispatch` manage its own worktrees.
+- If GitNexus is present, use it before code edits: impact analysis before symbol changes, change detection before commits, and `npx gitnexus analyze --embeddings` only when embeddings already exist.
+- Use RTK for noisy command output when the repo requires it or when output volume would obscure the decision.
+- Before finishing, run the smallest meaningful quality gate, update docs/vault notes if knowledge changed, commit intentionally, and push when the branch scope is clear.
+<!-- BORG_KNOWLEDGE_WORKFLOW_END -->
+
+---
+
 ## 🏗️ Agent Architect
 
 **Scope :** Root project — Dockerfile, docker-compose, CI/CD, scaffolding

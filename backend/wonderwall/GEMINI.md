@@ -46,3 +46,12 @@ wonderwall/
 
 ## Attention
 > L'internals de Wonderwall (fork OASIS) est complexe et couplé à CAMEL-AI. Les modifications doivent être chirurgicales. Ne pas refactoriser l'architecture interne de Wonderwall — seulement ajouter les guards de thread-safety et les hooks nécessaires.
+
+<!-- BORG_KNOWLEDGE_WORKFLOW_START -->
+## Borg Knowledge Vault & AI Workflow
+
+- Shared memory lives in `/home/_johan/Documents/Borg`. Start with `300 Entities/Projects/Portfolio - Condensed Knowledge.md`, `400 Resources/Tech/AI Knowledge Map.md`, `000 OS / Meta/AI Collaboration Protocol.md`, and `300 Entities/People/Johan - Working Profile.md`.
+- For this Wonderwall scope, also read root `GEMINI.md`, `AGENTS.md`, `backend/GEMINI.md`, and the vault symlink `300 Entities/Projects/RustyMiroSquid`.
+- Keep Wonderwall changes surgical. Mirror durable simulation/agent architecture decisions back into the vault instead of leaving them only in chat.
+- Use Beads/kspec if present, GitNexus before symbol edits, RTK for noisy command output, and run focused simulation/thread-safety tests before finishing.
+<!-- BORG_KNOWLEDGE_WORKFLOW_END -->
