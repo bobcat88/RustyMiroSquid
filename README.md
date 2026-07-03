@@ -1,3 +1,16 @@
+---
+type: reference
+tags:
+  - project/rustymirosquid
+aliases:
+- README
+---
+
+# RustyMiroSquid
+Up: [[RustyMiroSquid INDEX]]
+
+#projects #rustymirosquid
+
 <p align="center">
   <img src="./docs/images/rustymirosquid.png" alt="RustyMiroSquid" width="120" />
 </p>
@@ -117,6 +130,7 @@ The simulation engine is inherited from MiroShark. RustyMiroSquid adds investmen
 
 ```bash
 # 1. Start Neo4j
+
 docker run -d --name neo4j \
   -p 7474:7474 -p 7687:7687 \
   -e NEO4J_AUTH=neo4j/miroshark \

@@ -1,4 +1,14 @@
+---
+type: reference
+tags:
+  - project/rustymirosquid
+aliases:
+- Backlog-RustyMiroSquid-v1
+---
 # 🐙 RustyMiroSquid — Backlog des Évolutions
+Up: [[RustyMiroSquid INDEX]]
+
+#projects #rustymirosquid
 
 | # | Évolution | Complexité | Priorité | Description |
 |---|---|---|---|---|

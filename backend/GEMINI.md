@@ -1,4 +1,15 @@
+---
+type: reference
+tags:
+  - project/rustymirosquid
+  - domain/dev/backend
+aliases:
+- GEMINI
+---
 # 🐙 RustyMiroSquid Backend — GEMINI.md
+Up: [[RustyMiroSquid INDEX]]
+
+#projects #rustymirosquid #backend
 
 ## Scope
 Backend Python du moteur de simulation multi-agents. Inclut l'API FastAPI, les services (simulation, rapports, graphes), et le moteur Wonderwall (fork OASIS/CAMEL-AI).
@@ -83,11 +94,24 @@ scripts/action_logger.py
 
 ## Règle : `json.loads()` → `orjson.loads()`, `json.dumps()` → `orjson.dumps().decode()`
 
+<!-- MCP_REGISTRY_RULES_START -->
+## MCP Registry Rules
+
+- Treat `/home/_johan/Documents/Borg/AI-Agents/_shared/mcp-registry.md` as the canonical MCP source of truth.
+- Link it into active project roots as `MCP-REGISTRY.md` when practical.
+- Core MCPs: Memory (`@modelcontextprotocol/server-memory`), Context7 (`@upstash/context7-mcp`), and GitNexus (`gitnexus mcp`) for active development repos.
+- Enable Playwright MCP (`playwright-mcp`) only for UI/web/visual verification work.
+- Use per-agent config templates from `/home/_johan/Documents/Borg/AI-Agents/<agent>/` instead of ad-hoc snippets.
+- Use fully qualified MCP tool names in durable docs/skills when referencing connector tools.
+- Keep secrets out of MCP config files; use environment variables or the agent auth flow.
+- For Google-agent workflows, prefer Antigravity CLI (`agy`, installed via `https://antigravity.google/cli/install.sh`) over legacy Gemini CLI.
+<!-- MCP_REGISTRY_RULES_END -->
+
 <!-- BORG_KNOWLEDGE_WORKFLOW_START -->
 ## Borg Knowledge Vault & AI Workflow
 
 - Shared memory lives in `/home/_johan/Documents/Borg`. Start with `300 Entities/Projects/Portfolio - Condensed Knowledge.md`, `400 Resources/Tech/AI Knowledge Map.md`, `000 OS / Meta/AI Collaboration Protocol.md`, and `300 Entities/People/Johan - Working Profile.md`.
 - For this backend scope, also read root `GEMINI.md`, `AGENTS.md`, `backend/wonderwall/GEMINI.md` when touching simulation internals, and the vault symlink `300 Entities/Projects/RustyMiroSquid`.
 - Keep backend implementation details in repo docs, but mirror durable AI/simulation architecture decisions back into the vault.
-- Use Beads/kspec if present, GitNexus before symbol edits, RTK for noisy command output, and run the smallest meaningful backend quality gate before finishing.
+- Use Beads/GSD if present, GitNexus before symbol edits, RTK for noisy command output, and run the smallest meaningful backend quality gate before finishing.
 <!-- BORG_KNOWLEDGE_WORKFLOW_END -->

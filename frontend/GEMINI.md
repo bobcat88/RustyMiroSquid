@@ -1,4 +1,15 @@
+---
+type: reference
+tags:
+  - project/rustymirosquid
+  - domain/dev/frontend
+aliases:
+- GEMINI
+---
 # 🐙 RustyMiroSquid Frontend — GEMINI.md
+Up: [[RustyMiroSquid INDEX]]
+
+#projects #rustymirosquid #frontend
 
 ## Scope
 Dashboard Vue 3 pour la visualisation des simulations multi-agents. Affiche les activités Twitter/Reddit/Polymarket, les profils d'agents, et les rapports générés.
@@ -40,11 +51,24 @@ bun run build             # Build de production
 - [ ] Graphe de vélocité de sentiment (D3.js)
 - [ ] Dashboard d'investissement avec positions simulées
 
+<!-- MCP_REGISTRY_RULES_START -->
+## MCP Registry Rules
+
+- Treat `/home/_johan/Documents/Borg/AI-Agents/_shared/mcp-registry.md` as the canonical MCP source of truth.
+- Link it into active project roots as `MCP-REGISTRY.md` when practical.
+- Core MCPs: Memory (`@modelcontextprotocol/server-memory`), Context7 (`@upstash/context7-mcp`), and GitNexus (`gitnexus mcp`) for active development repos.
+- Enable Playwright MCP (`playwright-mcp`) only for UI/web/visual verification work.
+- Use per-agent config templates from `/home/_johan/Documents/Borg/AI-Agents/<agent>/` instead of ad-hoc snippets.
+- Use fully qualified MCP tool names in durable docs/skills when referencing connector tools.
+- Keep secrets out of MCP config files; use environment variables or the agent auth flow.
+- For Google-agent workflows, prefer Antigravity CLI (`agy`, installed via `https://antigravity.google/cli/install.sh`) over legacy Gemini CLI.
+<!-- MCP_REGISTRY_RULES_END -->
+
 <!-- BORG_KNOWLEDGE_WORKFLOW_START -->
 ## Borg Knowledge Vault & AI Workflow
 
 - Shared memory lives in `/home/_johan/Documents/Borg`. Start with `300 Entities/Projects/Portfolio - Condensed Knowledge.md`, `400 Resources/Tech/AI Knowledge Map.md`, `000 OS / Meta/AI Collaboration Protocol.md`, and `300 Entities/People/Johan - Working Profile.md`.
 - For this frontend scope, also read root `GEMINI.md`, `AGENTS.md`, and the vault symlink `300 Entities/Projects/RustyMiroSquid`.
 - Keep UI decisions tied to the investment-simulation workflow; mirror durable dashboard/product decisions back into the vault.
-- Use Beads/kspec if present, GitNexus before symbol edits, RTK for noisy command output, and run `bun run build` or the smallest relevant frontend gate before finishing.
+- Use Beads/GSD if present, GitNexus before symbol edits, RTK for noisy command output, and run `bun run build` or the smallest relevant frontend gate before finishing.
 <!-- BORG_KNOWLEDGE_WORKFLOW_END -->

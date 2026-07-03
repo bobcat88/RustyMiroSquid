@@ -1,4 +1,15 @@
+---
+type: reference
+tags:
+  - project/rustymirosquid
+  - domain/dev/backend
+aliases:
+- run
+---
 # MiroShark — Complete LLM Call Reference
+Up: [[RustyMiroSquid INDEX]]
+
+#projects #rustymirosquid #backend
 
 Every LLM invocation in the system, in execution order. Each entry documents the exact prompt, context fed, model routing, and purpose.
 

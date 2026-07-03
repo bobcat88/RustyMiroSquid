@@ -1,4 +1,14 @@
+---
+type: reference
+tags:
+  - project/rustymirosquid
+aliases:
+- Tracking-RustyMiroSquid-v1
+---
 # 🐙 RustyMiroSquid — Tracking Erreurs & Régressions
+Up: [[RustyMiroSquid INDEX]]
+
+#projects #rustymirosquid
 
 | # | Erreur | Statut | Version | Description |
 |---|---|---|---|---|

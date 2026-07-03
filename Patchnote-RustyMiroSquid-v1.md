@@ -1,4 +1,14 @@
+---
+type: reference
+tags:
+  - project/rustymirosquid
+aliases:
+- Patchnote-RustyMiroSquid-v1
+---
 # 🐙 RustyMiroSquid — Patch Notes
+Up: [[RustyMiroSquid INDEX]]
+
+#projects #rustymirosquid
 
 ## v1.0.0 — 2026-04-03
 

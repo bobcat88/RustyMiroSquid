@@ -1,4 +1,14 @@
+---
+type: reference
+tags:
+  - project/rustymirosquid
+aliases:
+- README-RustyMiroSquid-v1
+---
 # 🐙 RustyMiroSquid — README
+Up: [[RustyMiroSquid INDEX]]
+
+#projects #rustymirosquid
 
 ## Contexte & Finalité
 Mutation de **MiroShark** (moteur de simulation d'intelligence collective LLM-powered) en **RustyMiroSquid** — moteur haute performance dédié à l'analyse prédictive d'investissements. Le projet combine :

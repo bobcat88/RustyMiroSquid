@@ -1,4 +1,15 @@
+---
+type: reference
+tags:
+  - project/rustymirosquid
+  - domain/dev/backend
+aliases:
+- GEMINI
+---
 # 🐙 Wonderwall (Simulation Engine) — GEMINI.md
+Up: [[RustyMiroSquid INDEX]]
+
+#projects #rustymirosquid #backend #wonderwall
 
 ## Scope
 Fork d'OASIS (CAMEL-AI) — moteur de simulation multi-plateforme (Twitter, Reddit, Polymarket). Gère les agents sociaux, les états de croyance, et l'orchestration des rounds.
@@ -47,11 +58,24 @@ wonderwall/
 ## Attention
 > L'internals de Wonderwall (fork OASIS) est complexe et couplé à CAMEL-AI. Les modifications doivent être chirurgicales. Ne pas refactoriser l'architecture interne de Wonderwall — seulement ajouter les guards de thread-safety et les hooks nécessaires.
 
+<!-- MCP_REGISTRY_RULES_START -->
+## MCP Registry Rules
+
+- Treat `/home/_johan/Documents/Borg/AI-Agents/_shared/mcp-registry.md` as the canonical MCP source of truth.
+- Link it into active project roots as `MCP-REGISTRY.md` when practical.
+- Core MCPs: Memory (`@modelcontextprotocol/server-memory`), Context7 (`@upstash/context7-mcp`), and GitNexus (`gitnexus mcp`) for active development repos.
+- Enable Playwright MCP (`playwright-mcp`) only for UI/web/visual verification work.
+- Use per-agent config templates from `/home/_johan/Documents/Borg/AI-Agents/<agent>/` instead of ad-hoc snippets.
+- Use fully qualified MCP tool names in durable docs/skills when referencing connector tools.
+- Keep secrets out of MCP config files; use environment variables or the agent auth flow.
+- For Google-agent workflows, prefer Antigravity CLI (`agy`, installed via `https://antigravity.google/cli/install.sh`) over legacy Gemini CLI.
+<!-- MCP_REGISTRY_RULES_END -->
+
 <!-- BORG_KNOWLEDGE_WORKFLOW_START -->
 ## Borg Knowledge Vault & AI Workflow
 
 - Shared memory lives in `/home/_johan/Documents/Borg`. Start with `300 Entities/Projects/Portfolio - Condensed Knowledge.md`, `400 Resources/Tech/AI Knowledge Map.md`, `000 OS / Meta/AI Collaboration Protocol.md`, and `300 Entities/People/Johan - Working Profile.md`.
 - For this Wonderwall scope, also read root `GEMINI.md`, `AGENTS.md`, `backend/GEMINI.md`, and the vault symlink `300 Entities/Projects/RustyMiroSquid`.
 - Keep Wonderwall changes surgical. Mirror durable simulation/agent architecture decisions back into the vault instead of leaving them only in chat.
-- Use Beads/kspec if present, GitNexus before symbol edits, RTK for noisy command output, and run focused simulation/thread-safety tests before finishing.
+- Use Beads/GSD if present, GitNexus before symbol edits, RTK for noisy command output, and run focused simulation/thread-safety tests before finishing.
 <!-- BORG_KNOWLEDGE_WORKFLOW_END -->
