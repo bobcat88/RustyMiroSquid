@@ -81,6 +81,12 @@ The simulation engine is inherited from MiroShark. RustyMiroSquid adds investmen
 
 ---
 
+## Architecture Diagram
+
+![RustyMiroSquid architecture workflow](docs/diagrams/architecture-workflow.png)
+
+---
+
 ## Architecture
 
 ```
